@@ -4,9 +4,11 @@ This document describes the REST API endpoints available in the URL Shortener se
 
 ## Endpoints Summary
 - `POST /shorten` - Create a new shortened URL
-- `GET /:shortCode` - Redirect to the original URL
+- `GET /r/:shortCode` - Redirect to the original URL
 - `GET /metrics` - Retrieve application metrics
 - `GET /health` - Application health check
+- `GET /simulate/slow` - (Testing) Simulate latency
+- `GET /simulate/cpu` - (Testing) Simulate CPU spike
 
 ---
 
@@ -102,5 +104,51 @@ curl http://localhost:5000/health
 {
   "status": "ok",
   "database": "connected"
+}
+```
+
+---
+
+### `GET /simulate/slow`
+Artificially delays the HTTP response for testing timeout limits and triggering Slow-Response Prometheus alerts.
+
+- **Method**: `GET`
+- **Path**: `/simulate/slow`
+- **Query Parameters**: `?seconds=` (float, defaults to 1.5, max 10.0)
+
+#### Request Example
+```bash
+curl http://localhost:5000/simulate/slow?seconds=2.0
+```
+
+#### Response Example (200 OK)
+```json
+{
+  "simulated": "slow_response",
+  "seconds": 2.0
+}
+```
+
+---
+
+### `GET /simulate/cpu`
+Forces an intensive synchronous mathematical loop to artificially spike CPU load, primarily to test the High CPU Prometheus alerts.
+
+- **Method**: `GET`
+- **Path**: `/simulate/cpu`
+- **Query Parameters**: `?seconds=` (float, defaults to 2.0, max 15.0)
+
+#### Request Example
+```bash
+curl http://localhost:5000/simulate/cpu?seconds=1.5
+```
+
+#### Response Example (200 OK)
+```json
+{
+  "simulated": "high_cpu",
+  "seconds": 1.503,
+  "iterations": 13958102,
+  "checksum": 841291
 }
 ```

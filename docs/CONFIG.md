@@ -17,3 +17,5 @@ Reference this guide to appropriately define application environments through se
 | `ALLOWED_HOSTS` | Security restriction representing a comma-separated whitelist limiting incoming `Host:` headers the load balancer routes explicitly. | `123.45.67.89,api.shortener.example` | Optional |
 | `DEBUG` / `FLASK_DEBUG` | Enables native stack traceback output and hot-reloading file changes. **Warning: Must be evaluated explicitly as `false` in production!** | `false` | Required |
 | `DISCORD_WEBHOOK_URL`| Remote Alertmanager callback destination webhook firing if monitoring thresholds report a system outage or unhandled application disruption. | `https://discord.com/api/web...` | Optional |
+| `GUNICORN_WORKERS` | Orchestrates the total amount of parallel Gunicorn WSGI Python workers to spawn securely. | `4` | Optional (Defaults to 1) |
+| `DB_HOST_PORT` | Allocates the explicit mapping for exposing the local host port resolving to the Postgres container internally. | `5432` | Optional |
