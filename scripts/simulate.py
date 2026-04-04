@@ -2,6 +2,10 @@ import argparse
 import subprocess
 import sys
 import time
+from urllib.parse import urlsplit, urlunsplit
+
+
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def parse_args():
@@ -35,12 +39,63 @@ def phase_banner(title):
 
 
 def normalize_url(url):
-    normalized = url.rstrip("/")
-    if normalized.startswith("http://localhost"):
-        return normalized.replace("http://localhost", "http://127.0.0.1", 1)
-    if normalized.startswith("https://localhost"):
-        return normalized.replace("https://localhost", "https://127.0.0.1", 1)
-    return normalized
+    raw = url.strip()
+    if "://" not in raw:
+        raw = "http://" + raw
+
+    parsed = urlsplit(raw)
+    scheme = parsed.scheme or "http"
+    netloc = parsed.netloc
+    path = parsed.path
+
+    # Recover from inputs like http://1.2.3.4/:9090
+    if netloc and path.startswith("/:") and path.count("/") == 1:
+        netloc = f"{netloc}:{path[2:]}"
+        path = ""
+
+    reparsed = urlsplit(urlunsplit((scheme, netloc, path, parsed.query, parsed.fragment)))
+    hostname = reparsed.hostname or ""
+    port = reparsed.port
+
+    if hostname in {"localhost", "::1"}:
+        hostname = "127.0.0.1"
+
+    if ":" in hostname and not hostname.startswith("["):
+        host_part = f"[{hostname}]"
+    else:
+        host_part = hostname
+
+    normalized_netloc = host_part + (f":{port}" if port else "")
+    normalized_path = reparsed.path.rstrip("/")
+    if normalized_path == "/":
+        normalized_path = ""
+
+    return urlunsplit(
+        (
+            reparsed.scheme or "http",
+            normalized_netloc,
+            normalized_path,
+            reparsed.query,
+            reparsed.fragment,
+        )
+    )
+
+
+def is_local_target(url):
+    parsed = urlsplit(url)
+    return (parsed.hostname or "") in LOCAL_HOSTS
+
+
+def with_port(url, port):
+    parsed = urlsplit(url)
+    hostname = parsed.hostname or "127.0.0.1"
+
+    if ":" in hostname and not hostname.startswith("["):
+        host_part = f"[{hostname}]"
+    else:
+        host_part = hostname
+
+    return urlunsplit((parsed.scheme or "http", f"{host_part}:{port}", "", "", ""))
 
 
 def launch_background(command):
@@ -93,9 +148,7 @@ def terminate_all(processes):
 
 
 def alertmanager_url_from_prometheus(prometheus_url):
-    if ":9090" in prometheus_url:
-        return prometheus_url.replace(":9090", ":9093")
-    return "http://localhost:9093"
+    return with_port(prometheus_url, 9093)
 
 
 def main():
@@ -105,8 +158,9 @@ def main():
     python = sys.executable
     host = normalize_url(args.host)
     prometheus = normalize_url(args.prometheus)
+    local_target = is_local_target(host)
     alertmanager = alertmanager_url_from_prometheus(prometheus)
-    grafana = normalize_url("http://localhost:3000")
+    grafana = with_port(prometheus, 3000)
 
     if host != args.host.rstrip("/"):
         print(
@@ -120,19 +174,40 @@ def main():
         )
 
     try:
-        phase_banner("PHASE 0 - Seed fake data")
-        run_blocking(
-            [
-                python,
-                "scripts/fake_data.py",
-                "--users",
-                "50",
-                "--urls",
-                "200",
-                "--events",
-                "2000",
-            ]
-        )
+        if local_target:
+            phase_banner("PHASE 0 - Seed fake data")
+            run_blocking(
+                [
+                    python,
+                    "scripts/fake_data.py",
+                    "--users",
+                    "50",
+                    "--urls",
+                    "200",
+                    "--events",
+                    "2000",
+                ]
+            )
+        else:
+            phase_banner("PHASE 0 - Remote HTTP seed")
+            print(
+                "Remote target detected - skipping direct DB seeding and priming data through the public API instead",
+                flush=True,
+            )
+            run_blocking(
+                [
+                    python,
+                    "scripts/load_generator.py",
+                    "--host",
+                    host,
+                    "--workers",
+                    "1",
+                    "--duration",
+                    "5",
+                    "--rps",
+                    "1",
+                ]
+            )
 
         phase_banner("PHASE 1 - Baseline traffic")
         baseline = launch_background(
@@ -239,19 +314,30 @@ def main():
         active_processes.remove(("high cpu injection", high_cpu))
 
         phase_banner("PHASE 6 - Service kill")
-        print("SERVICE KILLED - ServiceDown alert should fire within 1 minute", flush=True)
-        if args.discord:
-            print("Check Discord for notification", flush=True)
-        run_blocking(
-            [
-                python,
-                "scripts/kill_service.py",
-                "--host",
-                host,
-                "--down-time",
-                "90",
-            ]
-        )
+        if local_target:
+            print("SERVICE KILLED - ServiceDown alert should fire within 1 minute", flush=True)
+            if args.discord:
+                print("Check Discord for notification", flush=True)
+            run_blocking(
+                [
+                    python,
+                    "scripts/kill_service.py",
+                    "--host",
+                    host,
+                    "--down-time",
+                    "90",
+                ]
+            )
+        else:
+            print(
+                "Remote target detected - skipping kill_service because it only stops a local Docker container",
+                flush=True,
+            )
+            if args.discord:
+                print(
+                    "To trigger ServiceDown on the deployed host, stop the app container on the droplet for at least 60 seconds",
+                    flush=True,
+                )
 
         phase_banner("PHASE 7 - Recovery baseline")
         recovery = launch_background(
@@ -287,7 +373,7 @@ def main():
     print(f"Open Alertmanager at {alertmanager}", flush=True)
     if args.discord:
         print(
-            "Check Discord for: HighErrorRate + SlowResponseTime + HighCPU + ServiceDown alerts and resolved notifications",
+            "Check Discord for: HighErrorRate + SlowResponseTime + HighCPU alerts and, if tested locally or manually on the droplet, ServiceDown + resolved notifications",
             flush=True,
         )
     print(
