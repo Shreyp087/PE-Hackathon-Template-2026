@@ -9,3 +9,4 @@
 | [Runbook](RUNBOOK.md) | Incident response playbooks |
 | [Decision Log](DECISIONS.md) | Architecture Decision Records (ADRs) |
 | [Capacity Plan](CAPACITY.md) | Load limits and scaling recommendations |
+| [Simulation Guide](SIMULATION.md) | Chaos engineering test suite and judge demo instructions |
