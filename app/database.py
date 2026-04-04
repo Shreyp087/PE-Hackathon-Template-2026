@@ -17,13 +17,18 @@ def initialize_db(app=None):
         password=os.getenv("DB_PASSWORD", "postgres"),
         host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", "5432")),
+        connect_timeout=2,
     )
     db_proxy.initialize(db)
 
     from app.models import Event, URL, User
 
-    with db:
-        db.create_tables([User, URL, Event], safe=True)
+    try:
+        with db:
+            db.create_tables([User, URL, Event], safe=True)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Database initialization failed or is offline: {e}")
 
     return db
 

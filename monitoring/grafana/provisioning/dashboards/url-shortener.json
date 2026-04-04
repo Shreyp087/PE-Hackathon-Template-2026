@@ -164,7 +164,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * sum(rate(http_requests_total{status=~\"5..\"}[2m])) / sum(rate(http_requests_total[2m]))",
+          "expr": "100 * (sum(rate(http_requests_total{status=~\"5..\"}[2m])) or vector(0)) / sum(rate(http_requests_total[2m]))",
           "legendFormat": "5xx error rate",
           "range": true,
           "refId": "A"

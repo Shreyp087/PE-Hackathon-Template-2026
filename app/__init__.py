@@ -20,7 +20,16 @@ def create_app():
     @app.before_request
     def _before_request():
         g.start_time = time.perf_counter()
-        db_proxy.connect(reuse_if_open=True)
+        if request.endpoint == "main.metrics":
+            return
+        try:
+            db_proxy.connect(reuse_if_open=True)
+        except Exception:
+            pass
+
+    @app.errorhandler(Exception)
+    def global_error_handler(e):
+        return {"error": "fatal_internal_error"}, 500
 
     @app.teardown_appcontext
     def _teardown_db(exc):
