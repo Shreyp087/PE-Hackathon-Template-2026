@@ -1,3 +1,11 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["monitoring*"]
+
 [project]
 name = "mlh-pe-hackathon"
 version = "0.1.0"
@@ -5,7 +13,12 @@ requires-python = ">=3.13"
 dependencies = [
     "faker>=33.0",
     "flask>=3.1",
+    "gunicorn>=23.0",
     "peewee>=3.17",
+    "prometheus-client>=0.21",
     "psycopg2-binary>=2.9",
+    "psutil>=6.1",
+    "python-dateutil>=2.9",
+    "python-json-logger>=2.0",
     "python-dotenv>=1.0",
 ]

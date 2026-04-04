@@ -1,0 +1,35 @@
+groups:
+  - name: url-shortener-alerts
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="url-shortener"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: URL Shortener is DOWN
+
+      - alert: HighErrorRate
+        expr: (sum(rate(http_requests_total{status=~"5.."}[2m])) / sum(rate(http_requests_total[2m]))) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: High 5xx error rate
+
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: P95 latency > 1s
+
+      - alert: HighCPU
+        expr: sum(rate(process_cpu_seconds_total{job="url-shortener"}[2m])) > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU usage

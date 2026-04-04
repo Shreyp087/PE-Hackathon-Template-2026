@@ -1,0 +1,78 @@
+services:
+  app:
+    image: ${APP_IMAGE:-url-shortener:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DB_NAME: ${DB_NAME:-hackathon_db}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hackathon_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - promdata:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    env_file:
+      - .env
+    entrypoint:
+      - /bin/sh
+      - -c
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml.template:ro
+    command:
+      - |
+        sed "s|DISCORD_WEBHOOK_URL_PLACEHOLDER|$${DISCORD_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.yml.template > /tmp/alertmanager.yml && \
+        /bin/alertmanager --config.file=/tmp/alertmanager.yml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: hackathon2026
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafdata:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  promdata:
+  grafdata:

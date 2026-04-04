@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>URL Shortener Control Center</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Incident Response Quest</p>
+          <h1>URL Shortener Control Center</h1>
+          <p class="hero-copy">
+            Shorten links, inspect service health, watch recent activity, and prove the
+            stack is observable without leaving the browser.
+          </p>
+        </div>
+        <div class="hero-status">
+          <div class="status-card">
+            <span class="status-label">Service</span>
+            <strong id="health-status">Checking...</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Environment</span>
+            <strong>Docker + Flask + Prometheus</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="panel panel-span-2">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">App UI</p>
+              <h2>Create a short URL</h2>
+            </div>
+            <div class="chip-row">
+              <span class="chip">API live</span>
+              <span class="chip">Metrics live</span>
+              <span class="chip">Logs live</span>
+            </div>
+          </div>
+
+          <form id="shorten-form" class="shorten-form">
+            <label for="url-input">Paste a URL</label>
+            <div class="form-row">
+              <input
+                id="url-input"
+                name="url"
+                type="url"
+                placeholder="https://example.com/something/important"
+                required
+              >
+              <button type="submit">Shorten</button>
+            </div>
+            <p class="form-hint">Only http:// and https:// URLs are accepted.</p>
+          </form>
+
+          <div id="shorten-result" class="result-card hidden"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Observability</p>
+              <h2>Open the stack</h2>
+            </div>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" id="grafana-link" target="_blank" rel="noreferrer">Grafana</a>
+            <a class="link-card" id="prometheus-link" target="_blank" rel="noreferrer">Prometheus</a>
+            <a class="link-card" id="alertmanager-link" target="_blank" rel="noreferrer">Alertmanager</a>
+            <a class="link-card" href="/metrics" target="_blank" rel="noreferrer">Raw metrics</a>
+          </div>
+        </section>
+
+        <section class="panel panel-span-2">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">System view</p>
+              <h2>Live resource snapshot</h2>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <article class="metric-card">
+              <span>CPU</span>
+              <strong id="cpu-percent">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>Memory used</span>
+              <strong id="memory-used">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>Memory percent</span>
+              <strong id="memory-percent">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>Disk percent</span>
+              <strong id="disk-percent">-</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel panel-span-2">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Traffic</p>
+              <h2>Recent active URLs</h2>
+            </div>
+          </div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Short code</th>
+                  <th>Original URL</th>
+                  <th>Clicks</th>
+                  <th>Created</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="recent-urls-body">
+                <tr>
+                  <td colspan="5" class="empty-state">Loading recent URLs...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Drilldown</p>
+              <h2>URL stats</h2>
+            </div>
+          </div>
+          <div id="stats-panel" class="stats-panel">
+            Select a short code to inspect click counts and event breakdown.
+          </div>
+        </section>
+
+        <section class="panel panel-span-3">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Manual check</p>
+              <h2>Recent structured logs</h2>
+            </div>
+          </div>
+          <div id="logs-panel" class="logs-panel">Loading logs...</div>
+        </section>
+      </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </body>
+</html>

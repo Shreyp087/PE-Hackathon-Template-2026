@@ -1,0 +1,21 @@
+route:
+  receiver: discord
+  group_wait: 30s
+  group_interval: 2m
+  repeat_interval: 4h
+  group_by:
+    - alertname
+
+receivers:
+  - name: discord
+    webhook_configs:
+      - url: DISCORD_WEBHOOK_URL_PLACEHOLDER
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal:
+      - alertname
