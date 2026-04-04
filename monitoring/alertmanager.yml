@@ -8,8 +8,8 @@ route:
 
 receivers:
   - name: discord
-    webhook_configs:
-      - url: DISCORD_WEBHOOK_URL_PLACEHOLDER
+    discord_configs:
+      - webhook_url: DISCORD_WEBHOOK_URL_PLACEHOLDER
         send_resolved: true
 
 inhibit_rules:

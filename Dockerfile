@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--preload", "--workers", "2", "--bind", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "run:app"]
+CMD ["sh", "-c", "gunicorn --preload --workers ${GUNICORN_WORKERS:-2} --bind 0.0.0.0:5000 --access-logfile - --error-logfile - run:app"]

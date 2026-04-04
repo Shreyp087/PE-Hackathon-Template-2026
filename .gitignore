@@ -12,6 +12,8 @@ build/
 
 # Environment variables
 .env
+.simulation*
+simulation-*.log
 
 # uv
 uv.lock

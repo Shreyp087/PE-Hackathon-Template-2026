@@ -12,6 +12,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_HOST: db
       DB_PORT: ${DB_PORT:-5432}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
     ports:
       - "5000:5000"
     depends_on:

@@ -2,6 +2,7 @@ import json
 import logging
 import secrets
 import string
+import time
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 from peewee import PeeweeException, fn
@@ -19,6 +20,15 @@ main = Blueprint("main", __name__)
 SHORT_CODE_ALPHABET = string.ascii_letters + string.digits
 SHORT_CODE_LENGTH = 6
 SHORT_CODE_MAX_ATTEMPTS = 64
+
+
+def _bounded_float_arg(name, default, minimum, maximum):
+    raw_value = request.args.get(name)
+    try:
+        value = float(raw_value) if raw_value is not None else default
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, value))
 
 
 def _log_db_error(operation, exc):
@@ -77,6 +87,8 @@ def index():
                 "urls": "/urls",
                 "all_urls": "/urls/all",
                 "logs": "/logs/recent",
+                "simulate_slow": "/simulate/slow?seconds=1.5",
+                "simulate_cpu": "/simulate/cpu?seconds=2.0",
             },
         )
 
@@ -99,6 +111,41 @@ def system():
 def recent_logs():
     limit = request.args.get("limit", default=100)
     return jsonify({"logs": get_recent_logs(limit=limit)})
+
+
+@main.get("/simulate/slow")
+def simulate_slow():
+    seconds = _bounded_float_arg("seconds", default=1.5, minimum=0.1, maximum=10.0)
+    time.sleep(seconds)
+    logger.info("slow_response_simulated", extra={"seconds": round(seconds, 3)})
+    return jsonify(simulated="slow_response", seconds=round(seconds, 3)), 200
+
+
+@main.get("/simulate/cpu")
+def simulate_cpu():
+    seconds = _bounded_float_arg("seconds", default=2.0, minimum=0.1, maximum=15.0)
+    started = time.perf_counter()
+    iterations = 0
+    checksum = 0
+
+    while time.perf_counter() - started < seconds:
+        checksum = (checksum + (iterations * iterations)) % 1000003
+        iterations += 1
+
+    actual_seconds = time.perf_counter() - started
+    logger.info(
+        "cpu_load_simulated",
+        extra={"seconds": round(actual_seconds, 3), "iterations": iterations},
+    )
+    return (
+        jsonify(
+            simulated="high_cpu",
+            seconds=round(actual_seconds, 3),
+            iterations=iterations,
+            checksum=checksum,
+        ),
+        200,
+    )
 
 
 @main.post("/shorten")

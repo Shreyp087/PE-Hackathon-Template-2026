@@ -11,12 +11,12 @@ groups:
           summary: URL Shortener is DOWN
 
       - alert: HighErrorRate
-        expr: (sum(rate(http_requests_total{status=~"5.."}[2m])) / sum(rate(http_requests_total[2m]))) > 0.05
+        expr: (sum(rate(http_requests_total{status=~"[45].."}[2m])) / sum(rate(http_requests_total[2m]))) > 0.05
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: High 5xx error rate
+          summary: High 4xx/5xx error rate
 
       - alert: SlowResponseTime
         expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)) > 1.0
