@@ -8,8 +8,8 @@ route:
 
 receivers:
   - name: discord
-    discord_configs:
-      - webhook_url: DISCORD_WEBHOOK_URL_PLACEHOLDER
+    webhook_configs:
+      - url: http://discord-relay:8080/alert
         send_resolved: true
 
 inhibit_rules:

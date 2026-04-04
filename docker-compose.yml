@@ -46,19 +46,26 @@ services:
 
   alertmanager:
     image: prom/alertmanager:latest
-    env_file:
-      - .env
-    entrypoint:
-      - /bin/sh
-      - -c
+    depends_on:
+      - discord-relay
     ports:
       - "9093:9093"
     volumes:
-      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml.template:ro
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
-      - |
-        sed "s|DISCORD_WEBHOOK_URL_PLACEHOLDER|$${DISCORD_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.yml.template > /tmp/alertmanager.yml && \
-        /bin/alertmanager --config.file=/tmp/alertmanager.yml
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    restart: unless-stopped
+
+  discord-relay:
+    image: python:3.13-slim
+    working_dir: /app
+    env_file:
+      - .env
+    volumes:
+      - ./scripts/discord_relay.py:/app/discord_relay.py:ro
+    command:
+      - "python"
+      - "/app/discord_relay.py"
     restart: unless-stopped
 
   grafana:

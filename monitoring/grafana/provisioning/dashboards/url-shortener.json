@@ -79,6 +79,7 @@
             "lineWidth": 2,
             "showPoints": "never"
           },
+          "min": 0,
           "unit": "s"
         },
         "overrides": []
@@ -122,18 +123,20 @@
             "drawStyle": "line",
             "fillOpacity": 12,
             "lineWidth": 2,
-            "showPoints": "never"
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
           },
+          "max": 100,
+          "min": 0,
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
               },
               {
                 "color": "red",
@@ -143,7 +146,23 @@
           },
           "unit": "percent"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx error rate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -164,7 +183,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * sum(rate(http_requests_total{status=~\"5..\"}[2m])) / sum(rate(http_requests_total[2m]))",
+          "expr": "100 * ((sum(rate(http_requests_total{status=~\"5..\"}[2m])) or vector(0)) / (sum(rate(http_requests_total[2m])) > 0))",
           "legendFormat": "5xx error rate",
           "range": true,
           "refId": "A"
@@ -172,66 +191,6 @@
       ],
       "title": "Error Rate %",
       "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 250
-              },
-              {
-                "color": "red",
-                "value": 1000
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "active_urls_total",
-          "legendFormat": "active urls",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Active URLs Total",
-      "type": "gauge"
     },
     {
       "datasource": "Prometheus",
@@ -265,10 +224,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 16
+        "x": 12,
+        "y": 8
       },
-      "id": 5,
+      "id": 4,
       "options": {
         "orientation": "auto",
         "reduceOptions": {
@@ -292,6 +251,68 @@
       ],
       "title": "CPU Usage %",
       "type": "gauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "decimals": 0,
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 250
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(url_created_total) or vector(0)",
+          "legendFormat": "active urls",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Active URLs Total",
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -373,6 +394,6 @@
   "timezone": "browser",
   "title": "URL Shortener - Golden Signals",
   "uid": "url-shortener-golden-signals",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
