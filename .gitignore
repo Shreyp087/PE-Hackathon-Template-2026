@@ -34,3 +34,6 @@ Thumbs.db
 
 # Judging (not visible to participants)
 judging/
+
+# Data Seed Files
+*.csv
