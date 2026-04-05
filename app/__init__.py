@@ -3,11 +3,12 @@ import time
 
 from dotenv import load_dotenv
 from flask import Flask, g, request
+from werkzeug.exceptions import HTTPException
 
 from app.database import db_proxy, initialize_db
 from app.logger import setup_logging
 from app.metrics import REQUEST_COUNT, REQUEST_LATENCY
-from app.routes import register_routes
+from app.routes import ensure_sample_data, register_routes
 
 
 def create_app():
@@ -29,6 +30,8 @@ def create_app():
 
     @app.errorhandler(Exception)
     def global_error_handler(e):
+        if isinstance(e, HTTPException):
+            return {"error": e.description or e.name}, e.code
         return {"error": "fatal_internal_error"}, 500
 
     @app.teardown_appcontext
@@ -67,6 +70,7 @@ def create_app():
         return response
 
     initialize_db(app)
+    ensure_sample_data()
     register_routes(app)
     logger.info("app_started")
 
