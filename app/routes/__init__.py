@@ -889,7 +889,7 @@ def _create_url_record(original_url, title=None, user_id=None, short_code=None, 
     Event.create(
         url=url_record,
         user=user_record,
-        event_type="created",
+        event_type="create",
         details=_details_to_text({"original_url": original_url, "short_code": short_code}),
     )
     URL_CREATED.inc()
@@ -1019,7 +1019,7 @@ def _perform_redirect(code):
             url_record.save()
             Event.create(
                 url=url_record,
-                user=url_record.user,
+                user=None,
                 event_type="click",
                 details=_details_to_text({
                     "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
@@ -1331,6 +1331,8 @@ def create_event():
     event_type = str(_first_present(payload, "event_type", "type") or "").strip()
     if not event_type:
         return jsonify(error="event_type is required"), 400
+    if _first_present(payload, "url_id", "url") is None:
+        return jsonify(error="url_id is required"), 400
 
     try:
         url_id = _safe_int(_first_present(payload, "url_id", "url"))
@@ -1423,6 +1425,9 @@ def bulk_events():
                         continue
                     raw_event_type = _first_present(item, "event_type", "type")
                     if raw_event_type is not None and not _is_string_like(raw_event_type):
+                        skipped += 1
+                        continue
+                    if _first_present(item, "url_id", "url") is None:
                         skipped += 1
                         continue
                     if _field_present(item, "url_id", "url") and not _is_int_like(_first_present(item, "url_id", "url")):

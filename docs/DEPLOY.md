@@ -41,13 +41,14 @@ Control Panel resource checklist (what to create right now):
 - Do not use for this runbook: `App Platform`, `Kubernetes Clusters`
 
 On Droplet:
-- Docker containers: app, db, prometheus, alertmanager, discord-relay, grafana
-- Nginx on host as reverse proxy + TLS termination (Let’s Encrypt)
+- Docker containers: app, db, prometheus, alertmanager, discord-relay, grafana, caddy
+- Caddy (inside Docker Compose) as reverse proxy + automatic TLS termination (Let's Encrypt)
 
 Public endpoints:
-- `https://<your-domain>` -> app
-- `https://grafana.<your-domain>` -> Grafana
-- Keep Prometheus and Alertmanager private unless needed
+- `https://link-shrink.duckdns.org/` -> App
+- `https://link-shrink.duckdns.org/grafana` -> Grafana
+- `https://link-shrink.duckdns.org/prometheus` -> Prometheus
+- `https://link-shrink.duckdns.org/alertmanager` -> Alertmanager
 
 ## 2. Create and Harden Droplet
 
@@ -216,17 +217,17 @@ sudo systemctl enable docker
 ## 9. Monitoring and Alert Validation
 
 1. Verify Prometheus targets
-- Open `http://<droplet-ip>:9090/targets`
+- Open `https://link-shrink.duckdns.org/prometheus/targets`
 - Confirm `url-shortener` target is UP
 
 2. Verify Grafana
-- Open `https://grafana.<your-domain>`
+- Open `https://link-shrink.duckdns.org/grafana`
 - Default admin user: `admin`
 - Password is currently set by compose env (`GF_SECURITY_ADMIN_PASSWORD`)
 - Change it immediately after first login
 
 3. Verify Alertmanager
-- Open `http://<droplet-ip>:9093`
+- Open `https://link-shrink.duckdns.org/alertmanager`
 - Trigger synthetic load and confirm alerts can fire
 4. Verify Discord relay behavior
 - Check relay logs: `docker compose logs --tail=100 discord-relay`
@@ -248,8 +249,8 @@ docker compose logs --tail=100 app
 
 Post-update smoke test:
 ```bash
-curl -i https://<your-domain>/health
-curl -i https://<your-domain>/metrics
+curl -i https://link-shrink.duckdns.org/health
+curl -i https://link-shrink.duckdns.org/metrics
 ```
 
 Code-change compatibility checks (recommended):
