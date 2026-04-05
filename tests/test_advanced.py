@@ -374,3 +374,32 @@ class TestEventsAdvanced:
         r = c.post("/events/bulk", json=events)
         print(f"BULK EVENTS STATUS: {r.status_code}, BODY: {r.get_json()}")
         assert r.status_code in (200, 201)
+
+    def test_bulk_events_csv_upload(self):
+        """POST /events/bulk with CSV file upload."""
+        c = _client()
+        import io
+        csv_content = "event_type,url_id,user_id,details\nclick,1,1,from_csv\nredirect,1,,from_csv\n"
+        r = c.post(
+            "/events/bulk",
+            data={"file": (io.BytesIO(csv_content.encode()), "events.csv"), "row_count": "10"},
+            content_type="multipart/form-data",
+        )
+        print(f"BULK EVENTS CSV STATUS: {r.status_code}, BODY: {r.get_json()}")
+        assert r.status_code in (200, 201)
+        body = r.get_json()
+        assert body.get("created", body.get("loaded", 0)) >= 1
+
+    def test_bulk_events_raw_csv(self):
+        """POST /events/bulk with raw CSV body."""
+        c = _client()
+        csv_content = "event_type,url_id,user_id,details\nclick,1,1,raw_csv\n"
+        r = c.post(
+            "/events/bulk?row_count=10",
+            data=csv_content,
+            content_type="text/csv",
+        )
+        print(f"BULK EVENTS RAW CSV STATUS: {r.status_code}, BODY: {r.get_json()}")
+        assert r.status_code in (200, 201)
+        body = r.get_json()
+        assert body.get("created", body.get("loaded", 0)) >= 1

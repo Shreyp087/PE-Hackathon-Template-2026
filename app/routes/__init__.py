@@ -441,6 +441,55 @@ def _load_events_csv(filepath, row_count=None):
     return loaded
 
 
+def _load_events_from_stream(stream_content, row_count=None):
+    """Load events from a CSV string (file upload or raw body)."""
+    loaded = 0
+    skipped = 0
+    reader = csv.DictReader(io.StringIO(stream_content))
+    with db_proxy.atomic():
+        for row in reader:
+            if row_count is not None and loaded >= row_count:
+                break
+            url_id = _safe_int(row.get("url_id") or row.get("url"))
+            user_id = _safe_int(row.get("user_id") or row.get("user"))
+            event_type = str(row.get("event_type") or row.get("type") or "").strip()
+
+            if not event_type or url_id is None:
+                skipped += 1
+                continue
+
+            url_record = _resolve_url_record(url_id)
+            if url_record is None:
+                skipped += 1
+                continue
+
+            user_record = None
+            if user_id is not None:
+                user_record = User.get_or_none(User.id == user_id)
+                if user_record is None:
+                    skipped += 1
+                    continue
+
+            payload = {
+                "event_type": event_type,
+                "url": url_record,
+                "user": user_record,
+                "timestamp": _parse_datetime_value(row.get("timestamp")),
+                "details": _details_to_text(row.get("details")),
+            }
+            row_id = _safe_int(row.get("id"))
+            if row_id is not None:
+                payload["id"] = row_id
+
+            try:
+                Event.insert(payload).on_conflict_ignore().execute()
+                loaded += 1
+            except Exception:
+                skipped += 1
+    _reset_sequence(Event)
+    return loaded, skipped
+
+
 # ── bootstrap ────────────────────────────────────────────────────────────────
 
 def ensure_sample_data():
@@ -1397,6 +1446,23 @@ def events_stats():
 @main.post("/events/bulk")
 def bulk_events():
     try:
+        # Case A: multipart file upload
+        uploaded_file = request.files.get("file")
+        if uploaded_file:
+            content = uploaded_file.read().decode("utf-8")
+            row_count = _safe_int(request.form.get("row_count"))
+            loaded, skipped = _load_events_from_stream(content, row_count=row_count)
+            return jsonify({
+                "loaded": loaded,
+                "count": loaded,
+                "created": loaded,
+                "skipped": skipped,
+                "rows_loaded": loaded,
+                "inserted": loaded,
+                "filename": uploaded_file.filename,
+                "file": uploaded_file.filename,
+            }), 201
+
         # JSON array of event objects
         raw_json = request.get_json(silent=True)
         if request.is_json:
@@ -1479,7 +1545,21 @@ def bulk_events():
                 return jsonify({"created": created, "skipped": skipped}), 201
             return jsonify(error="events must be a list"), 400
 
-        # Fallback: CSV from repo
+        # Case C: raw CSV body (Content-Type: text/csv or fallback)
+        content_type = request.content_type or ""
+        if "text/csv" in content_type or "text/plain" in content_type:
+            content = request.get_data(as_text=True)
+            if content:
+                row_count = _safe_int(request.args.get("row_count"))
+                loaded, skipped = _load_events_from_stream(content, row_count=row_count)
+                return jsonify({
+                    "created": loaded,
+                    "loaded": loaded,
+                    "count": loaded,
+                    "skipped": skipped,
+                }), 201
+
+        # Case D: form-data with filename pointing to repo CSV (legacy)
         payload = _request_payload()
         filename = _bulk_file_payload(payload) or "events.csv"
         row_count = _bulk_row_count(payload)
