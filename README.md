@@ -1,8 +1,8 @@
-# URL Shortener — MLH PE Hackathon 2026
+# Link-Shrink — MLH PE Hackathon 2026
 
 [![CI Smoke Tests](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml)
 
-A production-ready URL shortener built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
+**Link-Shrink** is a production-ready URL shortener featuring **End-to-End TLS Encryption via Caddy**, built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
 
 ## How We Prove Reliability
 - CI smoke tests run on every push and pull request to `main`.
@@ -89,9 +89,9 @@ curl http://localhost:5000/metrics
 ```
 
 If full stack is running, you can also open:
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Alertmanager: `http://localhost:9093`
+- Grafana: `https://link-shrink.duckdns.org/grafana`
+- Prometheus: `https://link-shrink.duckdns.org/prometheus`
+- Alertmanager: `https://link-shrink.duckdns.org/alertmanager`
 
 ## Demo Flow (First-Time User)
 Use this exact flow to go from setup to testing in about 10 minutes.

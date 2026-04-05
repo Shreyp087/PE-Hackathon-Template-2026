@@ -159,79 +159,16 @@ docker compose exec app python seed.py --users users.csv --urls urls.csv --event
 docker compose exec app python scripts/fake_data.py --users 50 --urls 200 --events 2000 --days 30
 ```
 
-## 6. Configure Nginx Reverse Proxy
+## 6. Configure Reverse Proxy & TLS (Caddy)
 
-Install Nginx:
-```bash
-sudo apt install -y nginx
-```
+This project uses **Caddy** natively inside Docker Compose to handle reverse-proxying and Let's Encrypt TLS/SSL certificates automatically.
 
-Create app site config:
-```bash
-sudo tee /etc/nginx/sites-available/url-shortener >/dev/null <<'EOF'
-server {
-    listen 80;
-    server_name <your-domain>;
+1. Ensure your DuckDNS (or other DNS) A record points to your Droplet IP.
+2. Ensure ports `80` (HTTP) and `443` (HTTPS) are open in your DigitalOcean Cloud Firewall and `ufw`.
+3. Update the `Caddyfile` with your domain if deploying to a different domain.
+4. Caddy automatically negotiates and renews Let's Encrypt certificates when you run `docker compose up -d`.
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
-```
-
-Optional Grafana subdomain:
-```bash
-sudo tee /etc/nginx/sites-available/grafana >/dev/null <<'EOF'
-server {
-    listen 80;
-    server_name grafana.<your-domain>;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
-```
-
-Enable and validate:
-```bash
-sudo ln -sf /etc/nginx/sites-available/url-shortener /etc/nginx/sites-enabled/url-shortener
-sudo ln -sf /etc/nginx/sites-available/grafana /etc/nginx/sites-enabled/grafana
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-## 7. TLS With Let’s Encrypt
-
-Ensure DNS A records are already pointing at Droplet IP:
-- `<your-domain>`
-- `grafana.<your-domain>` (if used)
-
-Install certbot:
-```bash
-sudo snap install core; sudo snap refresh core
-sudo snap install --classic certbot
-sudo ln -sf /snap/bin/certbot /usr/bin/certbot
-```
-
-Issue certificates:
-```bash
-sudo certbot --nginx -d <your-domain>
-sudo certbot --nginx -d grafana.<your-domain>
-```
-
-Validate renewal:
-```bash
-sudo certbot renew --dry-run
+There is no need to manually install Nginx or Certbot on the host machine!
 ```
 
 ## 8. Make It Survive Reboots

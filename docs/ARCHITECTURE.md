@@ -9,7 +9,7 @@ flowchart TD
     Client((Client))
     
     subgraph DigitalOcean
-        Proxy[Nginx Reverse Proxy]
+        Proxy[Caddy TLS/SSL Reverse Proxy]
         
         subgraph App Server
             App[Python Flask Backend]
@@ -43,7 +43,7 @@ flowchart TD
 
 ## Request Flow
 1. **Client**: A user visits a short URL or submits a request to the API to generate a new short URL.
-2. **Nginx Reverse Proxy**: Nginx on the Droplet receives HTTPS traffic and routes requests to Flask and observability services.
+2. **Caddy Reverse Proxy**: Caddy on the Droplet receives HTTPS traffic and securely subpath-routes requests to Flask and observability services.
 3. **App Server**: The Python Flask application processes the request.
     - If it's a `GET /r/:code`, it queries the database for the original URL and returns a `302 Redirect`.
    - If it's a `POST /shorten`, it generates a unique shortcode, commits it to PostgreSQL, and returns the short URL.
