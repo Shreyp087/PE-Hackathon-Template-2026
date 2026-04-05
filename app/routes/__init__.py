@@ -12,7 +12,6 @@ from pathlib import Path
 from dateutil.parser import parse as parse_datetime
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 from peewee import ForeignKeyField, IntegrityError, PeeweeException, fn
-from playhouse.shortcuts import model_to_dict
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.database import db_proxy
@@ -125,12 +124,12 @@ def _generate_short_code():
 
 def _normalize_serialized_value(value):
     if isinstance(value, datetime):
-        return value.isoformat()
+        return value.replace(microsecond=0).isoformat()
     return value
 
 
 def serialize(instance, extra=None):
-    payload = model_to_dict(instance, recurse=False)
+    payload = dict(instance.__data__)
     normalized = {}
     for field_name, value in payload.items():
         field = instance._meta.fields.get(field_name)
@@ -163,9 +162,7 @@ def _serialize_url(url_record, include_short_url=False):
 
 
 def _serialize_event(event_record):
-    payload = serialize(event_record)
-    payload["details"] = _serialize_details(event_record.details)
-    return payload
+    return serialize(event_record)
 
 
 # ── pagination ───────────────────────────────────────────────────────────────
@@ -735,6 +732,9 @@ def restore_user(user_id):
 @main.get("/users/<int:user_id>/urls")
 def list_urls_for_user(user_id):
     try:
+        user_record = User.get_or_none(User.id == user_id)
+        if user_record is None:
+            return jsonify(error="user not found"), 404
         query = URL.select().where(URL.user_id == user_id).order_by(URL.id)
         items, total = _paginate_query(query)
         return list_response([_serialize_url(u) for u in items], total), 200
@@ -746,6 +746,9 @@ def list_urls_for_user(user_id):
 @main.get("/users/<int:user_id>/events")
 def list_events_for_user(user_id):
     try:
+        user_record = User.get_or_none(User.id == user_id)
+        if user_record is None:
+            return jsonify(error="user not found"), 404
         query = Event.select().where(Event.user_id == user_id).order_by(Event.id)
         items, total = _paginate_query(query)
         return list_response([_serialize_event(e) for e in items], total), 200
@@ -1203,7 +1206,7 @@ def get_event(event_id):
     try:
         event_record = Event.get_or_none(Event.id == event_id)
         if event_record is None:
-            return jsonify(error="event not found"), 404
+            return jsonify(error="Event not found"), 404
         return jsonify(_serialize_event(event_record)), 200
     except PeeweeException as exc:
         _log_db_error("get_event", exc)
@@ -1247,7 +1250,7 @@ def delete_event(event_id):
     try:
         event_record = Event.get_or_none(Event.id == event_id)
         if event_record is None:
-            return jsonify(error="event not found"), 404
+            return jsonify(error="Event not found"), 404
         event_record.delete_instance()
         return jsonify({"deleted": True}), 200
     except PeeweeException as exc:
