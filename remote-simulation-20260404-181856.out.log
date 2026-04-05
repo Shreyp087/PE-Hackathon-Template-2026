@@ -1,0 +1,191 @@
+
+========================================================================
+PHASE 0 - Remote HTTP seed
+========================================================================
+Remote target detected - skipping direct DB seeding and priming data through the public API instead
+Running: C:\Python314\python.exe scripts/load_generator.py --host http://159.89.246.23 --workers 1 --duration 5 --rps 1
+{"elapsed_s": 5.79, "total_requests": 24, "success_2xx": 20, "redirect_3xx": 4, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+
+========================================================================
+PHASE 1 - Baseline traffic
+========================================================================
+Launching: C:\Python314\python.exe scripts/load_generator.py --host http://159.89.246.23 --duration 60 --rps 5
+Baseline traffic running - watch Grafana Request Rate panel
+{"elapsed_s": 11.72, "total_requests": 70, "success_2xx": 38, "redirect_3xx": 32, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 21.72, "total_requests": 121, "success_2xx": 57, "redirect_3xx": 64, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 31.72, "total_requests": 171, "success_2xx": 80, "redirect_3xx": 91, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 41.72, "total_requests": 219, "success_2xx": 97, "redirect_3xx": 122, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 51.72, "total_requests": 269, "success_2xx": 113, "redirect_3xx": 156, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 60.71, "total_requests": 310, "success_2xx": 134, "redirect_3xx": 176, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+
+========================================================================
+PHASE 2 - Traffic spike
+========================================================================
+Launching: C:\Python314\python.exe scripts/error_simulator.py --host http://159.89.246.23 --scenario spike --duration 60
+SPIKE started - watch Request Rate panel spike
+{"event": "seed_complete", "seeded_short_codes": 20}
+{"event": "scenario_start", "scenario": "spike", "duration_s": 60, "workers": 10}
+{"scenario": "spike", "elapsed_s": 5.01, "phase": "baseline", "target_rps": 2.0, "requests": 10, "errors": 0}
+{"scenario": "spike", "elapsed_s": 10.01, "phase": "baseline", "target_rps": 2.0, "requests": 20, "errors": 0}
+{"scenario": "spike", "elapsed_s": 15.01, "phase": "spike", "target_rps": 2.04, "requests": 30, "errors": 0}
+{"scenario": "spike", "elapsed_s": 20.03, "phase": "spike", "target_rps": 18.42, "requests": 64, "errors": 0}
+{"scenario": "spike", "elapsed_s": 25.05, "phase": "spike", "target_rps": 34.84, "requests": 191, "errors": 0}
+{"scenario": "spike", "elapsed_s": 30.07, "phase": "spike", "target_rps": 51.22, "requests": 366, "errors": 0}
+{"scenario": "spike", "elapsed_s": 35.07, "phase": "spike", "target_rps": 67.56, "requests": 543, "errors": 0}
+{"scenario": "spike", "elapsed_s": 40.15, "phase": "spike", "target_rps": 84.15, "requests": 717, "errors": 0}
+{"scenario": "spike", "elapsed_s": 45.16, "phase": "recovery", "target_rps": 2.0, "requests": 888, "errors": 0}
+{"scenario": "spike", "elapsed_s": 50.16, "phase": "recovery", "target_rps": 2.0, "requests": 903, "errors": 0}
+{"scenario": "spike", "elapsed_s": 55.19, "phase": "recovery", "target_rps": 2.0, "requests": 913, "errors": 0}
+{"scenario": "spike", "elapsed_s": 60.19, "phase": "recovery", "target_rps": 2.0, "requests": 923, "errors": 0}
+{"event": "scenario_complete", "scenario": "spike", "elapsed_s": 64.99, "phase": "recovery", "target_rps": 2.0, "requests": 923, "errors": 0}
+
+========================================================================
+PHASE 3 - High error rate
+========================================================================
+Launching: C:\Python314\python.exe scripts/error_simulator.py --host http://159.89.246.23 --scenario high_error_rate --duration 90
+ERROR INJECTION started - HighErrorRate alert should fire within 2 minutes
+{"event": "seed_complete", "seeded_short_codes": 20}
+{"event": "scenario_start", "scenario": "high_error_rate", "duration_s": 90, "target_rps": 20}
+{"scenario": "high_error_rate", "elapsed_s": 5.06, "responses_4xx": 71, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 10.12, "responses_4xx": 142, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 15.15, "responses_4xx": 212, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 20.17, "responses_4xx": 282, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 25.24, "responses_4xx": 354, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 30.28, "responses_4xx": 424, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 35.3, "responses_4xx": 493, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 40.34, "responses_4xx": 563, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 45.39, "responses_4xx": 630, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 50.41, "responses_4xx": 701, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 55.43, "responses_4xx": 767, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 60.68, "responses_4xx": 822, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 65.69, "responses_4xx": 891, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 70.69, "responses_4xx": 943, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 75.7, "responses_4xx": 1013, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 80.71, "responses_4xx": 1080, "responses_5xx": 0, "errors": 0}
+{"scenario": "high_error_rate", "elapsed_s": 85.75, "responses_4xx": 1146, "responses_5xx": 0, "errors": 0}
+{"event": "scenario_complete", "scenario": "high_error_rate", "elapsed_s": 90.06, "responses_4xx": 1199, "responses_5xx": 0, "errors": 0}
+
+========================================================================
+PHASE 4 - Slow responses
+========================================================================
+Launching: C:\Python314\python.exe scripts/error_simulator.py --host http://159.89.246.23 --scenario slow_responses --duration 180
+SLOW RESPONSE INJECTION started - SlowResponseTime alert should fire within about 3 minutes
+{"event": "seed_complete", "seeded_short_codes": 20}
+{"event": "scenario_start", "scenario": "slow_responses", "duration_s": 180, "threads": 1}
+{"scenario": "slow_responses", "elapsed_s": 10.01, "samples": 5, "p50_latency_ms": 1667.08, "p95_latency_ms": 1679.61, "requests": 5, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 20.07, "samples": 6, "p50_latency_ms": 1667.76, "p95_latency_ms": 1727.94, "requests": 11, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 30.08, "samples": 6, "p50_latency_ms": 1671.67, "p95_latency_ms": 1707.37, "requests": 17, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 40.09, "samples": 6, "p50_latency_ms": 1673.73, "p95_latency_ms": 1714.29, "requests": 23, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 50.11, "samples": 6, "p50_latency_ms": 1678.63, "p95_latency_ms": 1717.59, "requests": 29, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 60.12, "samples": 6, "p50_latency_ms": 1668.62, "p95_latency_ms": 1722.37, "requests": 35, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 70.14, "samples": 6, "p50_latency_ms": 1667.53, "p95_latency_ms": 1898.67, "requests": 41, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 80.15, "samples": 6, "p50_latency_ms": 1668.16, "p95_latency_ms": 2671.55, "requests": 47, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 90.16, "samples": 6, "p50_latency_ms": 1665.41, "p95_latency_ms": 1701.53, "requests": 53, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 100.17, "samples": 5, "p50_latency_ms": 1676.71, "p95_latency_ms": 1718.43, "requests": 58, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 110.19, "samples": 6, "p50_latency_ms": 1670.02, "p95_latency_ms": 1702.08, "requests": 64, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 120.23, "samples": 6, "p50_latency_ms": 1668.75, "p95_latency_ms": 1704.93, "requests": 70, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 130.28, "samples": 6, "p50_latency_ms": 1688.11, "p95_latency_ms": 1735.02, "requests": 76, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 140.3, "samples": 6, "p50_latency_ms": 1667.74, "p95_latency_ms": 1672.09, "requests": 82, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 150.3, "samples": 6, "p50_latency_ms": 1667.31, "p95_latency_ms": 1677.88, "requests": 88, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 160.31, "samples": 6, "p50_latency_ms": 1673.9, "p95_latency_ms": 1691.04, "requests": 94, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 170.31, "samples": 6, "p50_latency_ms": 1672.49, "p95_latency_ms": 1757.59, "requests": 100, "errors": 0}
+{"scenario": "slow_responses", "elapsed_s": 180.35, "samples": 6, "p50_latency_ms": 1667.32, "p95_latency_ms": 1688.92, "requests": 106, "errors": 0}
+{"event": "scenario_complete", "scenario": "slow_responses", "elapsed_s": 180.35, "samples": 0, "p50_latency_ms": 0.0, "p95_latency_ms": 0.0, "requests": 106, "errors": 0}
+
+========================================================================
+PHASE 5 - High CPU
+========================================================================
+Launching: C:\Python314\python.exe scripts/error_simulator.py --host http://159.89.246.23 --scenario high_cpu --duration 300
+HIGH CPU INJECTION started - HighCPU alert should fire after the 2m rate window and 2m hold time
+{"event": "seed_complete", "seeded_short_codes": 20}
+{"event": "scenario_start", "scenario": "high_cpu", "duration_s": 300, "threads": 1}
+{"scenario": "high_cpu", "elapsed_s": 5.01, "requests": 3, "errors": 0, "p50_latency_ms": 1570.29, "p95_latency_ms": 1573.35}
+{"scenario": "high_cpu", "elapsed_s": 10.06, "requests": 6, "errors": 0, "p50_latency_ms": 1573.78, "p95_latency_ms": 1587.77}
+{"scenario": "high_cpu", "elapsed_s": 15.09, "requests": 9, "errors": 0, "p50_latency_ms": 1567.44, "p95_latency_ms": 1576.59}
+{"scenario": "high_cpu", "elapsed_s": 20.1, "requests": 12, "errors": 0, "p50_latency_ms": 1571.01, "p95_latency_ms": 1622.38}
+{"scenario": "high_cpu", "elapsed_s": 25.12, "requests": 15, "errors": 0, "p50_latency_ms": 1582.06, "p95_latency_ms": 1585.41}
+{"scenario": "high_cpu", "elapsed_s": 30.12, "requests": 19, "errors": 0, "p50_latency_ms": 1572.03, "p95_latency_ms": 1572.52}
+{"scenario": "high_cpu", "elapsed_s": 35.13, "requests": 22, "errors": 0, "p50_latency_ms": 1567.13, "p95_latency_ms": 1570.26}
+{"scenario": "high_cpu", "elapsed_s": 40.13, "requests": 25, "errors": 0, "p50_latency_ms": 1575.23, "p95_latency_ms": 1587.2}
+{"scenario": "high_cpu", "elapsed_s": 45.14, "requests": 28, "errors": 0, "p50_latency_ms": 1568.49, "p95_latency_ms": 1590.02}
+{"scenario": "high_cpu", "elapsed_s": 50.15, "requests": 31, "errors": 0, "p50_latency_ms": 1586.29, "p95_latency_ms": 1610.85}
+{"scenario": "high_cpu", "elapsed_s": 55.17, "requests": 35, "errors": 0, "p50_latency_ms": 1570.93, "p95_latency_ms": 1591.64}
+{"scenario": "high_cpu", "elapsed_s": 60.19, "requests": 38, "errors": 0, "p50_latency_ms": 1564.06, "p95_latency_ms": 1565.29}
+{"scenario": "high_cpu", "elapsed_s": 65.19, "requests": 41, "errors": 0, "p50_latency_ms": 1560.81, "p95_latency_ms": 1587.31}
+{"scenario": "high_cpu", "elapsed_s": 70.21, "requests": 44, "errors": 0, "p50_latency_ms": 1579.78, "p95_latency_ms": 1615.27}
+{"scenario": "high_cpu", "elapsed_s": 75.22, "requests": 47, "errors": 0, "p50_latency_ms": 1566.4, "p95_latency_ms": 1594.97}
+{"scenario": "high_cpu", "elapsed_s": 80.23, "requests": 50, "errors": 0, "p50_latency_ms": 1567.16, "p95_latency_ms": 1626.28}
+{"scenario": "high_cpu", "elapsed_s": 85.25, "requests": 54, "errors": 0, "p50_latency_ms": 1572.69, "p95_latency_ms": 1590.95}
+{"scenario": "high_cpu", "elapsed_s": 90.27, "requests": 57, "errors": 0, "p50_latency_ms": 1572.01, "p95_latency_ms": 1644.25}
+{"scenario": "high_cpu", "elapsed_s": 95.27, "requests": 60, "errors": 0, "p50_latency_ms": 1571.3, "p95_latency_ms": 1584.88}
+{"scenario": "high_cpu", "elapsed_s": 100.34, "requests": 63, "errors": 0, "p50_latency_ms": 1570.4, "p95_latency_ms": 1572.7}
+{"scenario": "high_cpu", "elapsed_s": 105.37, "requests": 66, "errors": 0, "p50_latency_ms": 1606.84, "p95_latency_ms": 1799.46}
+{"scenario": "high_cpu", "elapsed_s": 110.38, "requests": 69, "errors": 0, "p50_latency_ms": 1570.77, "p95_latency_ms": 1577.45}
+{"scenario": "high_cpu", "elapsed_s": 115.39, "requests": 73, "errors": 0, "p50_latency_ms": 1581.98, "p95_latency_ms": 1583.82}
+{"scenario": "high_cpu", "elapsed_s": 120.4, "requests": 76, "errors": 0, "p50_latency_ms": 1572.31, "p95_latency_ms": 1612.75}
+{"scenario": "high_cpu", "elapsed_s": 125.41, "requests": 79, "errors": 0, "p50_latency_ms": 1569.37, "p95_latency_ms": 1572.82}
+{"scenario": "high_cpu", "elapsed_s": 130.41, "requests": 82, "errors": 0, "p50_latency_ms": 1569.51, "p95_latency_ms": 1617.38}
+{"scenario": "high_cpu", "elapsed_s": 135.42, "requests": 85, "errors": 0, "p50_latency_ms": 1567.96, "p95_latency_ms": 1604.01}
+{"scenario": "high_cpu", "elapsed_s": 140.43, "requests": 88, "errors": 0, "p50_latency_ms": 1563.9, "p95_latency_ms": 1586.27}
+{"scenario": "high_cpu", "elapsed_s": 145.46, "requests": 92, "errors": 0, "p50_latency_ms": 1573.08, "p95_latency_ms": 1583.25}
+{"scenario": "high_cpu", "elapsed_s": 150.47, "requests": 95, "errors": 0, "p50_latency_ms": 1571.61, "p95_latency_ms": 1582.8}
+{"scenario": "high_cpu", "elapsed_s": 155.47, "requests": 98, "errors": 0, "p50_latency_ms": 1569.76, "p95_latency_ms": 1596.82}
+{"scenario": "high_cpu", "elapsed_s": 160.47, "requests": 101, "errors": 0, "p50_latency_ms": 1563.19, "p95_latency_ms": 1575.9}
+{"scenario": "high_cpu", "elapsed_s": 165.47, "requests": 104, "errors": 0, "p50_latency_ms": 1591.36, "p95_latency_ms": 1677.27}
+{"scenario": "high_cpu", "elapsed_s": 170.48, "requests": 107, "errors": 0, "p50_latency_ms": 1566.77, "p95_latency_ms": 1585.2}
+{"scenario": "high_cpu", "elapsed_s": 175.49, "requests": 111, "errors": 0, "p50_latency_ms": 1580.38, "p95_latency_ms": 1581.27}
+{"scenario": "high_cpu", "elapsed_s": 180.49, "requests": 114, "errors": 0, "p50_latency_ms": 1570.31, "p95_latency_ms": 1576.35}
+{"scenario": "high_cpu", "elapsed_s": 185.49, "requests": 117, "errors": 0, "p50_latency_ms": 1574.54, "p95_latency_ms": 1584.76}
+{"scenario": "high_cpu", "elapsed_s": 190.51, "requests": 120, "errors": 0, "p50_latency_ms": 1563.47, "p95_latency_ms": 1574.81}
+{"scenario": "high_cpu", "elapsed_s": 195.52, "requests": 123, "errors": 0, "p50_latency_ms": 1590.33, "p95_latency_ms": 1599.91}
+{"scenario": "high_cpu", "elapsed_s": 200.52, "requests": 126, "errors": 0, "p50_latency_ms": 1582.46, "p95_latency_ms": 1618.9}
+{"scenario": "high_cpu", "elapsed_s": 205.52, "requests": 130, "errors": 0, "p50_latency_ms": 1578.84, "p95_latency_ms": 1596.08}
+{"scenario": "high_cpu", "elapsed_s": 210.53, "requests": 133, "errors": 0, "p50_latency_ms": 1567.06, "p95_latency_ms": 1569.72}
+{"scenario": "high_cpu", "elapsed_s": 215.54, "requests": 136, "errors": 0, "p50_latency_ms": 1578.12, "p95_latency_ms": 1582.16}
+{"scenario": "high_cpu", "elapsed_s": 220.54, "requests": 139, "errors": 0, "p50_latency_ms": 1570.84, "p95_latency_ms": 1571.93}
+{"scenario": "high_cpu", "elapsed_s": 225.56, "requests": 142, "errors": 0, "p50_latency_ms": 1578.47, "p95_latency_ms": 1586.98}
+{"scenario": "high_cpu", "elapsed_s": 230.56, "requests": 146, "errors": 0, "p50_latency_ms": 1569.76, "p95_latency_ms": 1585.55}
+{"scenario": "high_cpu", "elapsed_s": 235.56, "requests": 149, "errors": 0, "p50_latency_ms": 1569.24, "p95_latency_ms": 1580.84}
+{"scenario": "high_cpu", "elapsed_s": 240.59, "requests": 152, "errors": 0, "p50_latency_ms": 1570.59, "p95_latency_ms": 1635.71}
+{"scenario": "high_cpu", "elapsed_s": 245.59, "requests": 155, "errors": 0, "p50_latency_ms": 1606.83, "p95_latency_ms": 1634.74}
+{"scenario": "high_cpu", "elapsed_s": 250.59, "requests": 158, "errors": 0, "p50_latency_ms": 1576.37, "p95_latency_ms": 1612.95}
+{"scenario": "high_cpu", "elapsed_s": 255.61, "requests": 161, "errors": 0, "p50_latency_ms": 1585.64, "p95_latency_ms": 1586.91}
+{"scenario": "high_cpu", "elapsed_s": 260.62, "requests": 165, "errors": 0, "p50_latency_ms": 1590.89, "p95_latency_ms": 1630.2}
+{"scenario": "high_cpu", "elapsed_s": 265.62, "requests": 168, "errors": 0, "p50_latency_ms": 1564.76, "p95_latency_ms": 1568.82}
+{"scenario": "high_cpu", "elapsed_s": 270.62, "requests": 171, "errors": 0, "p50_latency_ms": 1570.13, "p95_latency_ms": 1574.53}
+{"scenario": "high_cpu", "elapsed_s": 275.64, "requests": 174, "errors": 0, "p50_latency_ms": 1565.06, "p95_latency_ms": 1568.03}
+{"scenario": "high_cpu", "elapsed_s": 280.64, "requests": 177, "errors": 0, "p50_latency_ms": 1573.1, "p95_latency_ms": 1575.66}
+{"scenario": "high_cpu", "elapsed_s": 285.64, "requests": 180, "errors": 0, "p50_latency_ms": 1563.95, "p95_latency_ms": 1566.65}
+{"scenario": "high_cpu", "elapsed_s": 290.65, "requests": 184, "errors": 0, "p50_latency_ms": 1611.02, "p95_latency_ms": 1620.43}
+{"scenario": "high_cpu", "elapsed_s": 295.65, "requests": 187, "errors": 0, "p50_latency_ms": 1584.42, "p95_latency_ms": 1801.74}
+{"scenario": "high_cpu", "elapsed_s": 300.66, "requests": 190, "errors": 0, "p50_latency_ms": 1564.51, "p95_latency_ms": 1565.41}
+{"event": "scenario_complete", "scenario": "high_cpu", "elapsed_s": 300.66, "requests": 190, "errors": 0, "p50_latency_ms": 0.0, "p95_latency_ms": 0.0}
+
+========================================================================
+PHASE 6 - Service kill
+========================================================================
+Remote target detected - skipping kill_service because it only stops a local Docker container
+To trigger ServiceDown on the deployed host, stop the app container on the droplet for at least 60 seconds
+
+========================================================================
+PHASE 7 - Recovery baseline
+========================================================================
+Launching: C:\Python314\python.exe scripts/load_generator.py --host http://159.89.246.23 --duration 60 --rps 3
+Recovery traffic - watch alerts resolve in Alertmanager
+{"elapsed_s": 11.53, "total_requests": 51, "success_2xx": 33, "redirect_3xx": 18, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 21.53, "total_requests": 81, "success_2xx": 42, "redirect_3xx": 39, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 31.54, "total_requests": 110, "success_2xx": 51, "redirect_3xx": 59, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 41.54, "total_requests": 140, "success_2xx": 67, "redirect_3xx": 73, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 51.54, "total_requests": 171, "success_2xx": 85, "redirect_3xx": 86, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 60.0, "total_requests": 198, "success_2xx": 96, "redirect_3xx": 102, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+{"elapsed_s": 61.69, "total_requests": 198, "success_2xx": 96, "redirect_3xx": 102, "client_error_4xx": 0, "server_error_5xx": 0, "errors": 0}
+
+========================================================================
+PHASE END - Summary
+========================================================================
+Simulation complete. Total runtime: 776s
+Open Grafana at http://159.89.246.23:3000 - admin / hackathon2026
+Open Prometheus at http://159.89.246.23:9090/alerts
+Open Alertmanager at http://159.89.246.23:9093
+Check Discord for: HighErrorRate + SlowResponseTime + HighCPU alerts and, if tested locally or manually on the droplet, ServiceDown + resolved notifications
+For judge demo: run python scripts/watch_alerts.py to show live terminal dashboard

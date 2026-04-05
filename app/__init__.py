@@ -1,8 +1,9 @@
 import logging
 import time
+import traceback
 
 from dotenv import load_dotenv
-from flask import Flask, g, request
+from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 from app.database import db_proxy, initialize_db
@@ -28,11 +29,24 @@ def create_app():
         except Exception:
             pass
 
+    # ── error handlers ───────────────────────────────────────────────────
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({"error": "not found"}), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        return jsonify({"error": "method not allowed"}), 405
+
     @app.errorhandler(Exception)
     def global_error_handler(e):
         if isinstance(e, HTTPException):
-            return {"error": e.description or e.name}, e.code
-        return {"error": "fatal_internal_error"}, 500
+            return jsonify({"error": e.description or e.name}), e.code
+        logger.error(
+            "unhandled_exception",
+            extra={"error": str(e), "type": type(e).__name__, "tb": traceback.format_exc()},
+        )
+        return jsonify({"error": str(e)}), 500
 
     @app.teardown_appcontext
     def _teardown_db(exc):
