@@ -1,9 +1,20 @@
-# Link-Shrink — MLH PE Hackathon 2026
+<div align="center">
+  <h1>🔗 Link-Shrink 🔗</h1>
+  <h3>MLH PE Hackathon 2026</h3>
 
-[![CI Smoke Tests](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml)
-[![Live Demo](https://img.shields.io/badge/Live_Demo-https%3A%2F%2Flink--shrink.duckdns.org-success?style=for-the-badge)](https://link-shrink.duckdns.org)
+  <a href="https://link-shrink.duckdns.org">
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-https%3A%2F%2Flink--shrink.duckdns.org-2ea44f?style=for-the-badge" alt="Live Demo" />
+  </a>
+  <a href="https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml">
+    <img src="https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg" alt="CI Smoke Tests" style="height: 28px;" />
+  </a>
+  <br><br>
 
-🚀 **Judges / Reviewers:** Test the live application here 👉 [https://link-shrink.duckdns.org](https://link-shrink.duckdns.org)
+  > **Judges / Reviewers:** 👉 **[Test the live application here](https://link-shrink.duckdns.org)** 👈
+
+</div>
+
+<br>
 
 **Link-Shrink** is a production-ready URL shortener featuring **End-to-End TLS Encryption via Caddy**, built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
 
