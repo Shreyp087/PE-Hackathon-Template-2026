@@ -280,6 +280,60 @@ class TestUrlsAdvanced:
         print(f"BULK URLS STATUS: {r.status_code}, BODY: {r.get_json()}")
         assert r.status_code in (200, 201)
 
+    def test_redirect_creates_redirect_event(self):
+        """GET redirect endpoint should record a redirect event automatically."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/redirect-event",
+            "title": "Redirect Event URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        redirect_resp = c.get(f"/urls/{short_code}/redirect", follow_redirects=False)
+        assert redirect_resp.status_code == 302
+
+        events_resp = c.get(f"/events?short_code={short_code}")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert any(event["event_type"] == "redirect" for event in items)
+
+    def test_inactive_url_redirect_does_not_create_event(self):
+        """Inactive URLs should not redirect or create a redirect event."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/inactive-redirect",
+            "title": "Inactive Redirect URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        deactivate_resp = c.put(f"/urls/{created_url['id']}", json={"is_active": False})
+        assert deactivate_resp.status_code == 200
+
+        before_resp = c.get(f"/events?short_code={short_code}")
+        assert before_resp.status_code == 200
+        before_payload = before_resp.get_json()
+        before_items = before_payload["sample"] if isinstance(before_payload, dict) else before_payload
+        before_redirect_events = sum(1 for event in before_items if event["event_type"] == "redirect")
+
+        redirect_resp = c.get(f"/urls/{short_code}/redirect", follow_redirects=False)
+        assert redirect_resp.status_code == 404
+
+        after_resp = c.get(f"/events?short_code={short_code}")
+        assert after_resp.status_code == 200
+        after_payload = after_resp.get_json()
+        after_items = after_payload["sample"] if isinstance(after_payload, dict) else after_payload
+        after_redirect_events = sum(1 for event in after_items if event["event_type"] == "redirect")
+
+        assert after_redirect_events == before_redirect_events
+
 
 # ══════════════════════════════════════════════════════════════
 # EVENTS

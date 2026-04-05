@@ -1073,7 +1073,7 @@ def _perform_redirect(code):
             Event.create(
                 url=url_record,
                 user=None,
-                event_type="click",
+                event_type="redirect",
                 details=_details_to_text({
                     "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
                     "short_code": url_record.short_code,
@@ -1290,7 +1290,11 @@ def _build_url_stats_response(url_record):
             .tuples()
         )
     }
-    click_count = event_breakdown.get("click", 0)
+    click_count = max(
+        url_record.click_count or 0,
+        event_breakdown.get("redirect", 0),
+        event_breakdown.get("click", 0),
+    )
     return jsonify({
         **_serialize_url(url_record),
         "total_events": total_events,
