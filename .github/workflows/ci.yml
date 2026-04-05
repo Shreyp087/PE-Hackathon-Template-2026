@@ -48,5 +48,5 @@ jobs:
 
       - name: Run smoke tests
         env:
-          DATABASE_URL: "postgresql://user:password@localhost:5432/test_db"
+          DATABASE_URL: "postgresql://${{ job.services.postgres.env.POSTGRES_USER }}:${{ job.services.postgres.env.POSTGRES_PASSWORD }}@localhost:${{ job.services.postgres.ports[5432] }}/${{ job.services.postgres.env.POSTGRES_DB }}"
         run: pytest -q
