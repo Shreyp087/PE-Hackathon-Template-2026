@@ -1,6 +1,14 @@
 # URL Shortener — MLH PE Hackathon 2026
 
+[![CI Smoke Tests](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml)
+
 A production-ready URL shortener built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
+
+## How We Prove Reliability
+- CI smoke tests run on every push and pull request to `main`.
+- The pipeline compiles Python sources and runs endpoint-level smoke tests.
+- Smoke tests verify `/health`, `/metrics`, `/system`, invalid URL handling, and JSON log formatter structure.
+- Operational reliability is also validated through Prometheus + Alertmanager + Grafana + Discord relay in Docker Compose.
 
 ## Documentation
 For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](docs/INDEX.md)**.

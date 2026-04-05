@@ -60,9 +60,19 @@ class DiscordRelayHandler(BaseHTTPRequestHandler):
             return
 
         if not WEBHOOK_URL:
-            self.send_response(500)
+            self.send_response(202)
             self.end_headers()
-            self.wfile.write(b"DISCORD_WEBHOOK_URL is not configured")
+            self.wfile.write(b"DISCORD_WEBHOOK_URL is not configured; alert skipped")
+            print(
+                json.dumps(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "level": "WARNING",
+                        "component": "discord_relay",
+                        "message": "webhook_not_configured",
+                    }
+                )
+            )
             return
 
         try:
@@ -116,6 +126,17 @@ def main():
             }
         )
     )
+    if not WEBHOOK_URL:
+        print(
+            json.dumps(
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "level": "WARNING",
+                    "component": "discord_relay",
+                    "message": "relay_running_without_webhook",
+                }
+            )
+        )
     server.serve_forever()
 
 

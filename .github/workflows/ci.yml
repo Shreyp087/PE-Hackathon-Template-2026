@@ -1,4 +1,4 @@
-name: Pytest CI
+name: CI Smoke Tests
 
 on:
   push:
