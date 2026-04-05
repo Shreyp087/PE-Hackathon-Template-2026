@@ -56,3 +56,7 @@ We ensure the application is highly observable and reliable via the following co
 - **Grafana**: A visualization dashboard that queries Prometheus to display graphs representing application health (e.g., latency, active connections, error rates).
 - **Alertmanager**: Integrates with Prometheus to ping Webhooks (e.g., Discord) if critical system thresholds are exceeded.
 - **Discord Relay**: Receives Alertmanager webhook payloads and forwards formatted alert messages to Discord using `DISCORD_WEBHOOK_URL`.
+
+## Database Durability Note
+- Production-preferred: DigitalOcean Managed PostgreSQL (automated backups + PITR).
+- Local fallback: containerized PostgreSQL with scheduled daily `pg_dump` backups to Spaces/S3.

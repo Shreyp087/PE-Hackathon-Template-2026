@@ -37,7 +37,8 @@ DigitalOcean resources:
 Control Panel resource checklist (what to create right now):
 - Create: `Droplets`, `Domains`, `Firewalls`
 - Optional later: `Load Balancers`, `Container Registry`, `VPC Networks`
-- Do not use for this runbook: `App Platform`, `Kubernetes Clusters`, `Managed Databases`
+- Recommended for DB durability: `Managed Databases` (PostgreSQL)
+- Do not use for this runbook: `App Platform`, `Kubernetes Clusters`
 
 On Droplet:
 - Docker containers: app, db, prometheus, alertmanager, discord-relay, grafana
@@ -130,10 +131,44 @@ DB_HOST_PORT=127.0.0.1:5432
 DISCORD_WEBHOOK_URL=<optional-discord-webhook>
 ```
 
+If you are using DigitalOcean Managed PostgreSQL instead of local container DB, use:
+```env
+DB_NAME=<managed-db-name>
+DB_USER=<managed-db-user>
+DB_PASSWORD=<managed-db-password>
+DB_HOST=<managed-db-hostname>
+DB_PORT=<managed-db-port>
+```
+
 Notes:
 - Do not leave production secrets as defaults.
 - If you want direct remote DB access, map `DB_HOST_PORT=5432` and lock it in firewall/IP allowlist.
 - If `DISCORD_WEBHOOK_URL` is empty, alerts will be accepted by `discord-relay` and skipped with warning logs.
+
+## 4A. Database Backups & Resilience (Required)
+
+Problem:
+- If PostgreSQL runs only as a local container on one Droplet, Droplet failure plus Docker volume corruption can permanently lose short-link data.
+
+Fix options:
+- Option 1 (recommended): Use DigitalOcean Managed PostgreSQL with automated backups + PITR.
+- Option 2 (fallback): Keep local containerized PostgreSQL and run daily `pg_dump` backups to DigitalOcean Spaces (S3-compatible) using cron.
+
+Option 1 setup checklist (Managed PostgreSQL):
+1. Create a PostgreSQL managed database in the same region as the Droplet.
+2. Add the Droplet/VPC as a trusted source.
+3. Set app `.env` to managed `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+4. Recreate app container: `docker compose up -d --force-recreate app`.
+5. Validate from app container with a simple `select 1` database check.
+
+Option 2 setup checklist (pg_dump + Spaces + cron):
+1. Create a Spaces bucket and generate Spaces access key/secret.
+2. Install AWS CLI on Droplet and configure credentials.
+3. Add cron job for daily dump and upload:
+```bash
+0 2 * * * docker compose exec -T db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > /tmp/url-shortener-$(date +\%F).sql.gz && aws s3 cp /tmp/url-shortener-$(date +\%F).sql.gz s3://<spaces-bucket>/db-backups/ && find /tmp -name 'url-shortener-*.sql.gz' -mtime +7 -delete
+```
+4. Test restore monthly to ensure backups are usable.
 
 ## 5. First Deployment
 
@@ -176,7 +211,6 @@ There is no need to manually install Nginx or Certbot on the host machine!
 Docker services already have `restart: unless-stopped`, but ensure Docker starts on boot:
 ```bash
 sudo systemctl enable docker
-sudo systemctl enable nginx
 ```
 
 ## 9. Monitoring and Alert Validation
@@ -244,8 +278,8 @@ APP_IMAGE=url-shortener:rollback docker compose up -d
 ## 12. Common Failure Cases and Fixes
 
 1. App restart-loop with DB connection refused
-- Check `.env` has `DB_PORT=5432` for docker deployment.
-- Confirm DB container is healthy: `docker compose ps db`.
+- For local DB mode: check `.env` has `DB_HOST=db` and `DB_PORT=5432`; confirm `db` container is healthy.
+- For managed DB mode: verify `DB_HOST`, `DB_PORT`, credentials, and trusted-source network rules.
 
 2. Certbot fails domain validation
 - Confirm A record points to Droplet IP.
@@ -262,7 +296,7 @@ APP_IMAGE=url-shortener:rollback docker compose up -d
 
 ## 13. Recommended Next Improvements
 
-- Move PostgreSQL to DigitalOcean Managed Postgres for higher durability.
+- If still on local DB container, migrate PostgreSQL to DigitalOcean Managed Postgres for higher durability.
 - Use DigitalOcean Container Registry and pinned immutable image tags.
 - Add CI/CD deployment pipeline with staged smoke checks.
 - Add external uptime checks for app and Grafana.

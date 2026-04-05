@@ -24,6 +24,12 @@
 - Smoke tests verify `/health`, `/metrics`, `/system`, invalid URL handling, and JSON log formatter structure.
 - Operational reliability is also validated through Prometheus + Alertmanager + Grafana + Discord relay in Docker Compose.
 
+## Database Backups & Resilience
+- Problem: If PostgreSQL runs only as a local container on a single Droplet, Droplet loss plus volume corruption can cause permanent short-link data loss.
+- Fix option 1 (recommended): use DigitalOcean Managed PostgreSQL with automated backups and PITR.
+- Fix option 2 (fallback): keep containerized PostgreSQL but run daily `pg_dump` backups to DigitalOcean Spaces (S3-compatible) via cron.
+- Production note: document and test restore steps, not just backup creation.
+
 ## Documentation
 For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](docs/INDEX.md)**.
 

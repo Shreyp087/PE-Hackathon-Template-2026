@@ -9,8 +9,8 @@ Use this guide to configure the `.env` file at the repository root.
 | `DB_NAME` | PostgreSQL database name used by the app. | `hackathon_db` |
 | `DB_USER` | PostgreSQL username. | `postgres` |
 | `DB_PASSWORD` | PostgreSQL password. | `postgres` |
-| `DB_HOST` | Database host: `localhost` for local app runtime, `db` for docker-compose runtime. | `localhost` |
-| `DB_PORT` | Database port (container internal). | `5432` |
+| `DB_HOST` | Database host: `localhost` for local app runtime, `db` for docker-compose runtime, or managed DB hostname for production. | `localhost` |
+| `DB_PORT` | Database port: `5432` for local/containerized DB or managed DB port from provider. | `5432` |
 
 ## Optional Variables
 
@@ -37,3 +37,17 @@ Docker Compose app + Docker DB:
 DB_HOST=db
 DB_PORT=5432
 ```
+
+Managed PostgreSQL (DigitalOcean):
+
+```env
+DB_HOST=<managed-db-hostname>
+DB_PORT=<managed-db-port>
+DB_NAME=<managed-db-name>
+DB_USER=<managed-db-user>
+DB_PASSWORD=<managed-db-password>
+```
+
+Durability note:
+- If you keep local/containerized PostgreSQL in production, schedule daily `pg_dump` backups to object storage (DigitalOcean Spaces/S3).
+- If you use managed PostgreSQL, enable automated backups and point-in-time recovery.

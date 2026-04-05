@@ -44,3 +44,16 @@ This document formally tracks pivotal architectural choices over the trajectory 
   - Eradicates paralyzing orchestration complexities maximizing output mapping specifically scaled for tight Hackathon MVP timelines.
   - Stabilizes budgets into rigid predictably cheap thresholds dynamically.
   - Imposes a massive single point of failure (SPOF) ceiling constraint gracefully forcing migrations natively towards robust VPC Load-Balanced Droplet arrays whenever hyper-scaling thresholds shatter MVP designs natively.
+
+  ---
+
+  ### ADR 5: Database durability strategy for production
+  - **Status**: Approved
+  - **Context**: A local PostgreSQL container on a single Droplet has a catastrophic failure mode: Droplet failure plus Docker volume corruption can permanently lose short-link mappings and event history.
+  - **Decision**:
+    - Primary path: use **DigitalOcean Managed PostgreSQL** with automated backups and point-in-time recovery.
+    - Fallback path: if running local containerized PostgreSQL, run a daily `pg_dump` backup job to DigitalOcean Spaces/S3 with periodic restore drills.
+  - **Consequences**:
+    - Managed DB reduces operational risk and recovery time, but increases monthly cost.
+    - Local DB + cron backup is lower-cost but operationally heavier and easier to misconfigure.
+    - Team must treat restore validation as a recurring operational task, not a one-time setup.

@@ -8,6 +8,11 @@ For a complete look into our architecture, endpoints, telemetry, and operations,
 ## Overview
 This service provides a fast, scalable way to shorten long URLs and redirect users seamlessly. It utilizes a Python Flask backend, Peewee ORM for database interactions, and PostgreSQL for robust data storage. The stack focuses on reliability, with a full monitoring suite ready for deployment on DigitalOcean.
 
+## Database Backups & Resilience
+- Problem: if PostgreSQL runs only in a local Docker volume on one Droplet, Droplet loss plus volume corruption can permanently lose short-link data.
+- Fix option 1 (recommended): use DigitalOcean Managed PostgreSQL with automated backups and point-in-time recovery.
+- Fix option 2 (fallback): run daily `pg_dump` backups to DigitalOcean Spaces/S3 via cron, and test restores regularly.
+
 ## Prerequisites
 - **uv**: Fast Python package manager. Install via:
   - macOS/Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
