@@ -196,6 +196,14 @@ def _bulk_row_count(payload):
     )
 
 
+def _first_present(payload, *keys):
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and value != "":
+            return value
+    return None
+
+
 def _bulk_response(filename, loaded, status_code=201):
     file_name = Path(filename).name
     response = {
@@ -435,8 +443,8 @@ def get_user(user_id):
 @main.post("/users")
 def create_user():
     payload = _request_payload()
-    username = str(payload.get("username", "")).strip()
-    email = str(payload.get("email", "")).strip()
+    username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
+    email = str(_first_present(payload, "email", "mail") or "").strip()
     if not username or not email:
         return jsonify(error="username and email are required"), 400
 
@@ -474,15 +482,20 @@ def update_user(user_id):
         if user_record is None:
             return jsonify(error="user not found"), 404
 
-        if "username" in payload:
-            user_record.username = str(payload.get("username") or "").strip()
-        if "email" in payload:
-            user_record.email = str(payload.get("email") or "").strip()
+        if _first_present(payload, "username", "user_name", "name") is not None:
+            user_record.username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
+        if _first_present(payload, "email", "mail") is not None:
+            user_record.email = str(_first_present(payload, "email", "mail") or "").strip()
         user_record.save()
         return jsonify(_serialize_user(user_record)), 200
     except PeeweeException as exc:
         _log_db_error("update_user", exc)
         return jsonify(error="database_error"), 500
+
+
+@main.patch("/users/<int:user_id>")
+def patch_user(user_id):
+    return update_user(user_id)
 
 
 @main.delete("/users/<int:user_id>")
@@ -523,6 +536,27 @@ def list_events_for_user(user_id):
         return jsonify(error="database_error"), 500
 
 
+@main.get("/users/<int:user_id>/stats")
+def stats_for_user(user_id):
+    try:
+        user_record = User.get_or_none(User.id == user_id)
+        if user_record is None:
+            return jsonify(error="user not found"), 404
+        return (
+            jsonify(
+                {
+                    **_serialize_user(user_record),
+                    "urls_count": URL.select().where(URL.user_id == user_id).count(),
+                    "events_count": Event.select().where(Event.user_id == user_id).count(),
+                }
+            ),
+            200,
+        )
+    except PeeweeException as exc:
+        _log_db_error("stats_for_user", exc)
+        return jsonify(error="database_error"), 500
+
+
 def _create_url_record(original_url, title=None, user_id=None, short_code=None):
     user_record = None
     if user_id is not None:
@@ -546,16 +580,16 @@ def _create_url_record(original_url, title=None, user_id=None, short_code=None):
 
 @main.post("/shorten")
 def shorten_url():
-    payload = request.get_json(silent=True) or {}
-    original_url = str(payload.get("url", "")).strip()
+    payload = _request_payload()
+    original_url = str(_first_present(payload, "url", "original_url") or "").strip()
     if not (original_url.startswith("http://") or original_url.startswith("https://")):
         return jsonify(error="invalid_url"), 400
 
     try:
         url_record = _create_url_record(
             original_url,
-            user_id=_safe_int(payload.get("user_id")),
-            short_code=payload.get("short_code"),
+            user_id=_safe_int(_first_present(payload, "user_id", "user")),
+            short_code=_first_present(payload, "short_code", "shortCode"),
         )
     except IntegrityError:
         return jsonify(error="short_code already exists"), 409
@@ -576,9 +610,9 @@ def shorten_url():
 @main.post("/urls")
 def create_url():
     payload = _request_payload()
-    original_url = str(payload.get("original_url", "")).strip()
-    title = str(payload.get("title", "")).strip() or None
-    user_id = _safe_int(payload.get("user_id"))
+    original_url = str(_first_present(payload, "original_url", "url", "destination") or "").strip()
+    title = str(_first_present(payload, "title", "name", "label") or "").strip() or None
+    user_id = _safe_int(_first_present(payload, "user_id", "user"))
     if not original_url:
         return jsonify(error="original_url is required"), 400
     if not (original_url.startswith("http://") or original_url.startswith("https://")):
@@ -589,7 +623,7 @@ def create_url():
             original_url,
             title=title,
             user_id=user_id,
-            short_code=payload.get("short_code"),
+            short_code=_first_present(payload, "short_code", "shortCode"),
         )
         return jsonify(_serialize_url(url_record)), 201
     except IntegrityError:
@@ -671,10 +705,10 @@ def redirect_url_by_id(url_id):
 def list_urls():
     try:
         query = URL.select().order_by(URL.id)
-        user_id = _safe_int(request.args.get("user_id"))
+        user_id = _safe_int(_first_present(request.args, "user_id", "user"))
         if user_id is not None:
             query = query.where(URL.user_id == user_id)
-        is_active = _parse_bool(request.args.get("is_active"))
+        is_active = _parse_bool(_first_present(request.args, "is_active", "active"))
         if is_active is not None:
             query = query.where(URL.is_active == is_active)
         query = _paginate(query)
@@ -706,6 +740,18 @@ def get_url(url_id):
         return jsonify(error="database_error"), 500
 
 
+@main.get("/urls/<code>")
+def get_url_by_short_code(code):
+    try:
+        url_record = URL.get_or_none(URL.short_code == code)
+        if url_record is None:
+            return jsonify(error="url not found"), 404
+        return jsonify(_serialize_url(url_record)), 200
+    except PeeweeException as exc:
+        _log_db_error("get_url_by_short_code", exc)
+        return jsonify(error="database_error"), 500
+
+
 @main.put("/urls/<int:url_id>")
 def update_url(url_id):
     payload = _request_payload()
@@ -713,14 +759,18 @@ def update_url(url_id):
         url_record = URL.get_or_none(URL.id == url_id)
         if url_record is None:
             return jsonify(error="url not found"), 404
-        if "original_url" in payload:
-            url_record.original_url = str(payload.get("original_url") or "").strip()
-        if "title" in payload:
-            url_record.title = str(payload.get("title") or "").strip() or None
-        if "is_active" in payload:
-            url_record.is_active = bool(_parse_bool(payload.get("is_active"), url_record.is_active))
-        if "user_id" in payload:
-            user_id = _safe_int(payload.get("user_id"))
+        if _first_present(payload, "original_url", "url", "destination") is not None:
+            url_record.original_url = str(
+                _first_present(payload, "original_url", "url", "destination") or ""
+            ).strip()
+        if _first_present(payload, "title", "name", "label") is not None:
+            url_record.title = str(_first_present(payload, "title", "name", "label") or "").strip() or None
+        if _first_present(payload, "is_active", "active") is not None:
+            url_record.is_active = bool(
+                _parse_bool(_first_present(payload, "is_active", "active"), url_record.is_active)
+            )
+        if _first_present(payload, "user_id", "user") is not None:
+            user_id = _safe_int(_first_present(payload, "user_id", "user"))
             url_record.user = User.get_or_none(User.id == user_id) if user_id is not None else None
         url_record.save()
         _refresh_application_gauges()
@@ -728,6 +778,11 @@ def update_url(url_id):
     except PeeweeException as exc:
         _log_db_error("update_url", exc)
         return jsonify(error="database_error"), 500
+
+
+@main.patch("/urls/<int:url_id>")
+def patch_url(url_id):
+    return update_url(url_id)
 
 
 @main.delete("/urls/<int:url_id>")
@@ -801,13 +856,13 @@ def url_stats(code):
 def list_events():
     try:
         query = Event.select().order_by(Event.id)
-        url_id = _safe_int(request.args.get("url_id"))
+        url_id = _safe_int(_first_present(request.args, "url_id", "url"))
         if url_id is not None:
             query = query.where(Event.url_id == url_id)
-        user_id = _safe_int(request.args.get("user_id"))
+        user_id = _safe_int(_first_present(request.args, "user_id", "user"))
         if user_id is not None:
             query = query.where(Event.user_id == user_id)
-        event_type = request.args.get("event_type")
+        event_type = _first_present(request.args, "event_type", "type")
         if event_type:
             query = query.where(Event.event_type == str(event_type).strip())
         query = _paginate(query)
@@ -832,22 +887,39 @@ def get_event(event_id):
 @main.post("/events")
 def create_event():
     payload = _request_payload()
-    event_type = str(payload.get("event_type", "")).strip()
+    event_type = str(_first_present(payload, "event_type", "type") or "").strip()
     if not event_type:
         return jsonify(error="event_type is required"), 400
 
     try:
-        url_id = _safe_int(payload.get("url_id"))
-        user_id = _safe_int(payload.get("user_id"))
+        url_id = _safe_int(_first_present(payload, "url_id", "url"))
+        user_id = _safe_int(_first_present(payload, "user_id", "user"))
         event_record = Event.create(
             url=URL.get_or_none(URL.id == url_id) if url_id is not None else None,
             user=User.get_or_none(User.id == user_id) if user_id is not None else None,
             event_type=event_type,
-            details=_details_to_text(payload.get("details")),
+            details=_details_to_text(_first_present(payload, "details", "metadata", "meta", "payload")),
         )
         return jsonify(_serialize_event(event_record)), 201
     except PeeweeException as exc:
         _log_db_error("create_event", exc)
+        return jsonify(error="database_error"), 500
+
+
+@main.get("/events/stats")
+def events_stats():
+    try:
+        totals = {
+            event_type: count
+            for event_type, count in (
+                Event.select(Event.event_type, fn.COUNT(Event.id).alias("count"))
+                .group_by(Event.event_type)
+                .tuples()
+            )
+        }
+        return jsonify({"total_events": Event.select().count(), "by_type": totals}), 200
+    except PeeweeException as exc:
+        _log_db_error("events_stats", exc)
         return jsonify(error="database_error"), 500
 
 
