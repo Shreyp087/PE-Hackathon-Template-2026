@@ -28,7 +28,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "${DB_HOST_PORT}:5432"
+      - "127.0.0.1:5432:5432"
     restart: unless-stopped
 
   prometheus:
@@ -75,12 +75,31 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: hackathon2026
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_DOMAIN: "link-shrink.duckdns.org"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - grafdata:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     restart: unless-stopped
 
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - grafana
+
 volumes:
   pgdata:
   promdata:
   grafdata:
+  caddy_data:
+  caddy_config:
