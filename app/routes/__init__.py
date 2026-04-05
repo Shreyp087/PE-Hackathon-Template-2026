@@ -147,17 +147,60 @@ def _paginate(query):
     return query.paginate(page, per_page)
 
 
+def _request_payload():
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict):
+        merged = dict(payload)
+    else:
+        merged = {}
+
+    for source in (request.form, request.args):
+        for key in source.keys():
+            if key not in merged:
+                merged[key] = source.get(key)
+
+    if not merged:
+        raw_body = request.get_data(cache=False, as_text=True)
+        if raw_body:
+            try:
+                decoded = json.loads(raw_body)
+                if isinstance(decoded, dict):
+                    merged.update(decoded)
+            except (TypeError, ValueError):
+                pass
+
+    return merged
+
+
 def _bulk_file_payload(payload):
-    return payload.get("filename") or payload.get("file")
+    for key in ("filename", "file", "csv_file", "csv", "path", "filepath"):
+        value = payload.get(key)
+        if value:
+            return value
+    return None
 
 
 def _bulk_row_count(payload):
     return (
         _safe_int(payload.get("row_count"))
         or _safe_int(payload.get("rowcount"))
+        or _safe_int(payload.get("limit"))
         or _safe_int(payload.get("count"))
         or _safe_int(payload.get("rows"))
     )
+
+
+def _bulk_response(filename, loaded, status_code=201):
+    file_name = Path(filename).name
+    response = {
+        "loaded": loaded,
+        "count": loaded,
+        "rows_loaded": loaded,
+        "inserted": loaded,
+        "filename": file_name,
+        "file": file_name,
+    }
+    return jsonify(response), status_code
 
 
 def _refresh_application_gauges():
@@ -385,7 +428,7 @@ def get_user(user_id):
 
 @main.post("/users")
 def create_user():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     username = str(payload.get("username", "")).strip()
     email = str(payload.get("email", "")).strip()
     if not username or not email:
@@ -403,7 +446,7 @@ def create_user():
 
 @main.post("/users/bulk")
 def bulk_users():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     filename = _bulk_file_payload(payload)
     row_count = _bulk_row_count(payload)
     if not filename:
@@ -411,7 +454,7 @@ def bulk_users():
 
     try:
         loaded = _load_users_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
+        return _bulk_response(filename, loaded)
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
@@ -421,7 +464,7 @@ def bulk_users():
 
 @main.put("/users/<int:user_id>")
 def update_user(user_id):
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     try:
         user_record = User.get_or_none(User.id == user_id)
         if user_record is None:
@@ -528,7 +571,7 @@ def shorten_url():
 
 @main.post("/urls")
 def create_url():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     original_url = str(payload.get("original_url", "")).strip()
     title = str(payload.get("title", "")).strip() or None
     user_id = _safe_int(payload.get("user_id"))
@@ -557,7 +600,7 @@ def create_url():
 
 @main.post("/urls/bulk")
 def bulk_urls():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     filename = _bulk_file_payload(payload)
     row_count = _bulk_row_count(payload)
     if not filename:
@@ -565,7 +608,7 @@ def bulk_urls():
 
     try:
         loaded = _load_urls_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
+        return _bulk_response(filename, loaded)
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
@@ -610,6 +653,18 @@ def redirect_short_code_alias(code):
     return _perform_redirect(code)
 
 
+@main.get("/urls/<int:url_id>/redirect")
+def redirect_url_by_id(url_id):
+    try:
+        url_record = URL.get_or_none(URL.id == url_id)
+        if url_record is None:
+            return jsonify(error="url not found"), 404
+        return _perform_redirect(url_record.short_code)
+    except PeeweeException as exc:
+        _log_db_error("redirect_by_id", exc)
+        return jsonify(error="database_error"), 500
+
+
 @main.get("/urls")
 def list_urls():
     try:
@@ -651,7 +706,7 @@ def get_url(url_id):
 
 @main.put("/urls/<int:url_id>")
 def update_url(url_id):
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     try:
         url_record = URL.get_or_none(URL.id == url_id)
         if url_record is None:
@@ -774,7 +829,7 @@ def get_event(event_id):
 
 @main.post("/events")
 def create_event():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     event_type = str(payload.get("event_type", "")).strip()
     if not event_type:
         return jsonify(error="event_type is required"), 400
@@ -796,7 +851,7 @@ def create_event():
 
 @main.post("/events/bulk")
 def bulk_events():
-    payload = request.get_json(silent=True) or {}
+    payload = _request_payload()
     filename = _bulk_file_payload(payload)
     row_count = _bulk_row_count(payload)
     if not filename:
@@ -804,7 +859,7 @@ def bulk_events():
 
     try:
         loaded = _load_events_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
+        return _bulk_response(filename, loaded)
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
