@@ -1,6 +1,6 @@
 # API Documentation
 
-This document describes the REST API endpoints available in the URL Shortener service.
+This document describes the REST API endpoints available in the Link-Shrink service.
 
 ## Endpoints Summary
 - `POST /shorten` - Create a new shortened URL
