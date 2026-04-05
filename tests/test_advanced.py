@@ -381,6 +381,49 @@ class TestUrlsAdvanced:
         after_url = c.get(f"/urls/{created_url['id']}").get_json()
         assert after_url["click_count"] == 0
 
+    def test_create_url_records_created_event(self):
+        """POST /urls should create a created lifecycle event."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/created-lifecycle",
+            "title": "Created Lifecycle URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        events_resp = c.get(f"/events?short_code={short_code}&event_type=created")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert any(event["event_type"] == "created" for event in items)
+
+    def test_update_url_records_updated_event(self):
+        """PUT /urls should create an updated lifecycle event when fields change."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/updated-lifecycle",
+            "title": "Updated Lifecycle URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        update_resp = c.put(f"/urls/{created_url['id']}", json={"title": "Updated Lifecycle Title"})
+        assert update_resp.status_code == 200
+
+        events_resp = c.get(f"/events?short_code={short_code}&event_type=updated")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert any(event["event_type"] == "updated" for event in items)
+
 
 # ══════════════════════════════════════════════════════════════
 # EVENTS

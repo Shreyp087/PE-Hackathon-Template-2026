@@ -942,7 +942,7 @@ def _create_url_record(original_url, title=None, user_id=None, short_code=None, 
     Event.create(
         url=url_record,
         user=user_record,
-        event_type="create",
+        event_type="created",
         details=_details_to_text({"original_url": original_url, "short_code": short_code}),
     )
     URL_CREATED.inc()
@@ -1192,22 +1192,46 @@ def update_url(url_id):
         url_record = URL.get_or_none(URL.id == url_id)
         if url_record is None:
             return jsonify(error="url not found"), 404
+        changed_fields = {}
         if _first_present(payload, "original_url", "url", "destination") is not None:
-            url_record.original_url = str(
+            new_original_url = str(
                 _first_present(payload, "original_url", "url", "destination") or ""
             ).strip()
+            if new_original_url != url_record.original_url:
+                changed_fields["original_url"] = new_original_url
+                url_record.original_url = new_original_url
         if _first_present(payload, "title", "name", "label") is not None:
-            url_record.title = str(_first_present(payload, "title", "name", "label") or "").strip() or None
+            new_title = str(_first_present(payload, "title", "name", "label") or "").strip() or None
+            if new_title != url_record.title:
+                changed_fields["title"] = new_title
+                url_record.title = new_title
         if _first_present(payload, "is_active", "active") is not None:
-            url_record.is_active = bool(
+            new_is_active = bool(
                 _parse_bool(_first_present(payload, "is_active", "active"), url_record.is_active)
             )
+            if new_is_active != url_record.is_active:
+                changed_fields["is_active"] = new_is_active
+                url_record.is_active = new_is_active
         if _first_present(payload, "user_id", "user") is not None:
             user_id = _safe_int(_first_present(payload, "user_id", "user"))
-            url_record.user = User.get_or_none(User.id == user_id) if user_id is not None else None
+            new_user = User.get_or_none(User.id == user_id) if user_id is not None else None
+            new_user_id = new_user.id if new_user is not None else None
+            if new_user_id != url_record.user_id:
+                changed_fields["user_id"] = new_user_id
+                url_record.user = new_user
         if _first_present(payload, "short_code", "shortCode") is not None:
-            url_record.short_code = str(_first_present(payload, "short_code", "shortCode") or "").strip()
+            new_short_code = str(_first_present(payload, "short_code", "shortCode") or "").strip()
+            if new_short_code != url_record.short_code:
+                changed_fields["short_code"] = new_short_code
+                url_record.short_code = new_short_code
         url_record.save()
+        if changed_fields:
+            Event.create(
+                url=url_record,
+                user=url_record.user,
+                event_type="updated",
+                details=_details_to_text({"changes": changed_fields}),
+            )
         _refresh_application_gauges()
         return jsonify(_serialize_url(url_record)), 200
     except IntegrityError:
