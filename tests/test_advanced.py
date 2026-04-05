@@ -581,6 +581,50 @@ class TestEventsAdvanced:
         assert items
         assert all(event["event_type"] == "redirect" for event in items)
 
+    def test_events_by_created_type_returns_only_created_matches(self):
+        """GET /events?event_type=created should not include updated events."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/exact-created-type",
+            "title": "Exact Created Type URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+
+        update_resp = c.put(f"/urls/{created_url['id']}", json={"title": "Exact Created Type URL Updated"})
+        assert update_resp.status_code == 200
+
+        events_resp = c.get(f"/events?event_type=created&short_code={created_url['short_code']}")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert all(event["event_type"] == "created" for event in items)
+
+    def test_events_by_updated_type_returns_only_updated_matches(self):
+        """GET /events?event_type=updated should not include created events."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/exact-updated-type",
+            "title": "Exact Updated Type URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+
+        update_resp = c.put(f"/urls/{created_url['id']}", json={"title": "Exact Updated Type URL Changed"})
+        assert update_resp.status_code == 200
+
+        events_resp = c.get(f"/events?event_type=updated&short_code={created_url['short_code']}")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert all(event["event_type"] == "updated" for event in items)
+
     def test_list_events_invalid_url_id_returns_400(self):
         """GET /events with invalid url_id should return 400."""
         c = _client()
@@ -684,3 +728,28 @@ class TestEventsAdvanced:
         assert r.status_code in (200, 201)
         body = r.get_json()
         assert body.get("created", body.get("loaded", 0)) >= 1
+
+    def test_events_stats_includes_lifecycle_and_redirect_counts(self):
+        """GET /events/stats should include created, redirect, and updated events after those actions occur."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/stats-lifecycle",
+            "title": "Stats Lifecycle URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+
+        redirect_resp = c.get(f"/r/{created_url['short_code']}", follow_redirects=False)
+        assert redirect_resp.status_code == 302
+
+        update_resp = c.put(f"/urls/{created_url['id']}", json={"title": "Stats Lifecycle URL Updated"})
+        assert update_resp.status_code == 200
+
+        stats_resp = c.get("/events/stats")
+        assert stats_resp.status_code == 200
+        body = stats_resp.get_json()
+        by_type = body.get("by_type") or {}
+        assert by_type.get("created", 0) >= 1
+        assert by_type.get("redirect", 0) >= 1
+        assert by_type.get("updated", 0) >= 1
