@@ -15,7 +15,7 @@ const systemTargets = {
 
 function buildObservabilityLinks() {
   const host = window.location.hostname || "127.0.0.1";
-  document.getElementById("grafana-link").href = `http://${host}:3000/`;
+  document.getElementById("grafana-link").href = `/grafana/`;
   document.getElementById("prometheus-link").href = `http://${host}:9090/`;
   document.getElementById("alertmanager-link").href = `http://${host}:9093/`;
 }
