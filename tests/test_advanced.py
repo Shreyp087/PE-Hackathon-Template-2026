@@ -581,6 +581,22 @@ class TestEventsAdvanced:
         assert items
         assert all(event["event_type"] == "redirect" for event in items)
 
+    def test_list_events_invalid_url_id_returns_400(self):
+        """GET /events with invalid url_id should return 400."""
+        c = _client()
+        r = c.get("/events?url_id=notanint")
+        assert r.status_code == 400
+        body = r.get_json()
+        assert "url_id" in body["error"]
+
+    def test_list_events_invalid_user_id_returns_400(self):
+        """GET /events with invalid user_id should return 400."""
+        c = _client()
+        r = c.get("/events?user_id=notanint")
+        assert r.status_code == 400
+        body = r.get_json()
+        assert "user_id" in body["error"]
+
     def test_create_event_rejects_json_string_body(self):
         """POST /events should reject a JSON string instead of an object."""
         c = _client()
@@ -616,6 +632,29 @@ class TestEventsAdvanced:
         assert r.status_code == 404
         body = r.get_json()
         assert "error" in body
+
+    def test_create_event_inactive_url_returns_400(self):
+        """POST /events should reject inactive URLs."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/inactive-event-target",
+            "title": "Inactive Event Target",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+
+        deactivate_resp = c.put(f"/urls/{created_url['id']}", json={"is_active": False})
+        assert deactivate_resp.status_code == 200
+
+        r = c.post("/events", json={
+            "event_type": "click",
+            "url_id": created_url["id"],
+            "details": {"source": "inactive-check"},
+        })
+        assert r.status_code == 400
+        body = r.get_json()
+        assert "inactive" in body["error"]
 
     def test_bulk_events_csv_upload(self):
         """POST /events/bulk with CSV file upload."""

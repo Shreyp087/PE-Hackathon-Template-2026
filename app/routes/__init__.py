@@ -1342,11 +1342,17 @@ def list_events():
     try:
         query = Event.select().order_by(Event.timestamp.desc(), Event.id.desc())
 
-        url_id = _safe_int(_first_present(request.args, "url_id", "short_url_id", "url"))
+        raw_url_id = _first_present(request.args, "url_id", "short_url_id", "url")
+        if _field_present(request.args, "url_id", "short_url_id", "url") and not _is_int_like(raw_url_id):
+            return jsonify(error="url_id must be an integer"), 400
+        url_id = _safe_int(raw_url_id)
         if url_id is not None:
             query = query.where(Event.url_id == url_id)
 
-        user_id = _safe_int(_first_present(request.args, "user_id", "user"))
+        raw_user_id = _first_present(request.args, "user_id", "user")
+        if _field_present(request.args, "user_id", "user") and not _is_int_like(raw_user_id):
+            return jsonify(error="user_id must be an integer"), 400
+        user_id = _safe_int(raw_user_id)
         if user_id is not None:
             query = query.where(Event.user_id == user_id)
 
@@ -1441,6 +1447,8 @@ def create_event():
             url_record = _resolve_url_record(url_id)
             if url_record is None:
                 return jsonify(error="URL not found"), 404
+            if not url_record.is_active:
+                return jsonify(error="url is inactive"), 400
         user_record = None
         if user_id is not None:
             user_record = User.get_or_none(User.id == user_id)
