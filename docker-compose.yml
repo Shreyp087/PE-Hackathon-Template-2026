@@ -10,7 +10,7 @@ services:
       DB_NAME: ${DB_NAME:-hackathon_db}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_HOST: db
+      DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
     ports:
