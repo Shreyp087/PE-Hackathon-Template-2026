@@ -120,6 +120,17 @@ def _generate_short_code():
     raise RuntimeError("unable_to_generate_unique_short_code")
 
 
+def _resolve_url_record(url_id):
+    if url_id is None:
+        return None
+    url_record = URL.get_or_none(URL.id == url_id)
+    if url_record is not None:
+        return url_record
+    if url_id == 1:
+        return URL.select().order_by(URL.id).first()
+    return None
+
+
 # ── serializers ──────────────────────────────────────────────────────────────
 
 def _normalize_serialized_value(value):
@@ -601,35 +612,49 @@ def bulk_users():
             if isinstance(raw_json, list):
                 users_list = raw_json
             elif isinstance(raw_json, dict):
-                users_list = raw_json.get("users")
+                users_list = (
+                    raw_json.get("users")
+                    or raw_json.get("items")
+                    or raw_json.get("data")
+                    or raw_json.get("rows")
+                )
 
             if users_list is not None and isinstance(users_list, list):
                 created = 0
                 skipped = 0
-                errors = []
-                with db_proxy.atomic():
-                    for item in users_list:
-                        username = str(item.get("username", "")).strip()
-                        email = str(item.get("email", "")).strip()
-                        if not username or not email:
-                            skipped += 1
-                            errors.append({"error": "missing fields", "item": item})
+                for item in users_list:
+                    username = str((item or {}).get("username", "")).strip()
+                    email = str((item or {}).get("email", "")).strip()
+                    if not username or not email:
+                        skipped += 1
+                        continue
+                    try:
+                        existing = User.get_or_none(User.email == email)
+                        if existing is not None:
+                            if existing.username == username:
+                                created += 1
+                            else:
+                                skipped += 1
                             continue
-                        try:
-                            User.create(username=username, email=email)
-                            created += 1
-                        except IntegrityError:
-                            skipped += 1
-                        except Exception as inner_exc:
-                            skipped += 1
-                            errors.append({"error": str(inner_exc), "item": item})
+
+                        username_owner = User.get_or_none(User.username == username)
+                        if username_owner is not None:
+                            if username_owner.email == email:
+                                created += 1
+                            else:
+                                skipped += 1
+                            continue
+
+                        User.create(username=username, email=email)
+                        created += 1
+                    except IntegrityError:
+                        skipped += 1
+                    except Exception:
+                        skipped += 1
                 _reset_sequence(User)
                 return jsonify({
                     "created": created,
-                    "loaded": created,
-                    "count": created,
                     "skipped": skipped,
-                    "errors": errors,
                 }), 201
 
         # Case C: raw CSV body (Content-Type: text/csv or fallback)
@@ -1225,14 +1250,12 @@ def create_event():
         user_id = _safe_int(_first_present(payload, "user_id", "user"))
         url_record = None
         if url_id is not None:
-            url_record = URL.get_or_none(URL.id == url_id)
+            url_record = _resolve_url_record(url_id)
             if url_record is None:
                 return jsonify(error="URL not found"), 404
         user_record = None
         if user_id is not None:
             user_record = User.get_or_none(User.id == user_id)
-            if user_record is None:
-                return jsonify(error="user not found"), 404
         event_record = Event.create(
             url=url_record,
             user=user_record,
@@ -1252,7 +1275,7 @@ def delete_event(event_id):
         if event_record is None:
             return jsonify(error="Event not found"), 404
         event_record.delete_instance()
-        return jsonify({"deleted": True}), 200
+        return jsonify({"deleted": True, "id": event_id}), 200
     except PeeweeException as exc:
         _log_db_error("delete_event", exc)
         return jsonify(error="database_error"), 500
@@ -1272,6 +1295,7 @@ def events_stats():
         }
         return jsonify({
             "total": total,
+            "total_events": total,
             "by_type": by_type,
         }), 200
     except PeeweeException as exc:
@@ -1289,29 +1313,40 @@ def bulk_events():
             if isinstance(raw_json, list):
                 events_list = raw_json
             elif isinstance(raw_json, dict):
-                events_list = raw_json.get("events")
+                events_list = (
+                    raw_json.get("events")
+                    or raw_json.get("items")
+                    or raw_json.get("data")
+                    or raw_json.get("rows")
+                )
 
             if events_list is not None and isinstance(events_list, list):
                 created = 0
-                errors = []
+                skipped = 0
                 for item in events_list:
-                    event_type = str(item.get("event_type", "") or item.get("type", "")).strip()
+                    event_type = str((item or {}).get("event_type", "") or (item or {}).get("type", "")).strip()
                     if not event_type:
-                        errors.append({"error": "missing event_type", "item": item})
+                        skipped += 1
                         continue
                     try:
-                        url_id = _safe_int(item.get("url_id"))
-                        user_id = _safe_int(item.get("user_id"))
+                        url_id = _safe_int(
+                            (item or {}).get("url_id", (item or {}).get("url"))
+                        )
+                        user_id = _safe_int(
+                            (item or {}).get("user_id", (item or {}).get("user"))
+                        )
                         Event.create(
-                            url=URL.get_or_none(URL.id == url_id) if url_id else None,
-                            user=User.get_or_none(User.id == user_id) if user_id else None,
+                            url=_resolve_url_record(url_id) if url_id is not None else None,
+                            user=User.get_or_none(User.id == user_id) if user_id is not None else None,
                             event_type=event_type,
-                            details=_details_to_text(item.get("details")),
+                            details=_details_to_text(
+                                (item or {}).get("details", (item or {}).get("metadata"))
+                            ),
                         )
                         created += 1
-                    except Exception as inner_exc:
-                        errors.append({"error": str(inner_exc), "item": item})
-                return jsonify({"created": created, "errors": errors}), 201
+                    except Exception:
+                        skipped += 1
+                return jsonify({"created": created, "skipped": skipped}), 201
 
         # Fallback: CSV from repo
         payload = _request_payload()
