@@ -42,6 +42,7 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=7d"
+      - "--web.external-url=https://link-shrink.duckdns.org/prometheus/"
     restart: unless-stopped
 
   alertmanager:
@@ -54,6 +55,7 @@ services:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--web.external-url=https://link-shrink.duckdns.org/alertmanager/"
     restart: unless-stopped
 
   discord-relay:
