@@ -11,7 +11,7 @@ from pathlib import Path
 
 from dateutil.parser import parse as parse_datetime
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
-from peewee import ForeignKeyField, IntegrityError, PeeweeException, fn
+from peewee import IntegrityError, PeeweeException, fn
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.database import db_proxy
@@ -33,10 +33,7 @@ SHORT_CODE_MAX_ATTEMPTS = 64
 
 def list_response(items, total=None):
     """Standard list envelope expected by the grader."""
-    serialized = [
-        serialize(item) if not isinstance(item, dict) else item
-        for item in list(items)
-    ]
+    serialized = list(items)
     return jsonify({
         "kind": "list",
         "sample": serialized,
@@ -121,48 +118,54 @@ def _generate_short_code():
 
 
 # ── serializers ──────────────────────────────────────────────────────────────
-
-def _normalize_serialized_value(value):
-    if isinstance(value, datetime):
-        return value.replace(microsecond=0).isoformat()
-    return value
-
-
-def serialize(instance, extra=None):
-    payload = dict(instance.__data__)
-    normalized = {}
-    for field_name, value in payload.items():
-        field = instance._meta.fields.get(field_name)
-        target_key = field_name
-        if isinstance(field, ForeignKeyField):
-            target_key = field.column_name or f"{field_name}_id"
-        normalized[target_key] = _normalize_serialized_value(value)
-
-    if extra:
-        normalized.update(extra)
-    return normalized
+def _iso_or_none(value):
+    if value is None:
+        return None
+    return value.replace(microsecond=0).isoformat()
 
 
 def _serialize_user(user_record):
-    return serialize(user_record)
+    return {
+        "id": user_record.id,
+        "username": user_record.username,
+        "email": user_record.email,
+        "created_at": _iso_or_none(user_record.created_at),
+    }
 
 
 def _serialize_url(url_record, include_short_url=False):
-    extra = {}
+    payload = {
+        "id": url_record.id,
+        "user_id": url_record.__data__.get("user"),
+        "short_code": url_record.short_code,
+        "original_url": url_record.original_url,
+        "title": url_record.title,
+        "is_active": url_record.is_active,
+        "created_at": _iso_or_none(url_record.created_at),
+        "updated_at": _iso_or_none(url_record.updated_at),
+        "click_count": url_record.click_count,
+    }
     if include_short_url:
         try:
-            extra["short_url"] = url_for(
+            payload["short_url"] = url_for(
                 "main.redirect_short_code",
                 code=url_record.short_code,
                 _external=True,
             )
         except Exception:
-            extra["short_url"] = f"/r/{url_record.short_code}"
-    return serialize(url_record, extra or None)
+            payload["short_url"] = f"/r/{url_record.short_code}"
+    return payload
 
 
 def _serialize_event(event_record):
-    return serialize(event_record)
+    return {
+        "id": event_record.id,
+        "url_id": event_record.__data__.get("url"),
+        "user_id": event_record.__data__.get("user"),
+        "event_type": event_record.event_type,
+        "timestamp": _iso_or_none(event_record.timestamp),
+        "details": event_record.details if event_record.details else None,
+    }
 
 
 # ── pagination ───────────────────────────────────────────────────────────────
@@ -576,82 +579,83 @@ def create_user():
 
 @main.post("/users/bulk")
 def bulk_users():
+    created = 0
+    skipped = 0
     try:
-        # Case A: multipart file upload
-        uploaded_file = request.files.get("file")
-        if uploaded_file:
-            content = uploaded_file.read().decode("utf-8")
-            row_count = _safe_int(request.form.get("row_count"))
-            loaded, skipped = _load_users_from_stream(content, row_count=row_count)
-            return jsonify({
-                "loaded": loaded,
-                "count": loaded,
-                "created": loaded,
-                "skipped": skipped,
-                "rows_loaded": loaded,
-                "inserted": loaded,
-                "filename": uploaded_file.filename or "upload.csv",
-                "file": uploaded_file.filename or "upload.csv",
-            }), 201
-
-        # Case B: JSON array or JSON object with "users" key
-        raw_json = request.get_json(silent=True)
-        if raw_json is not None:
-            users_list = None
-            if isinstance(raw_json, list):
-                users_list = raw_json
-            elif isinstance(raw_json, dict):
-                users_list = raw_json.get("users")
-
-            if users_list is not None and isinstance(users_list, list):
-                created = 0
-                skipped = 0
-                errors = []
-                with db_proxy.atomic():
-                    for item in users_list:
-                        username = str(item.get("username", "")).strip()
-                        email = str(item.get("email", "")).strip()
-                        if not username or not email:
-                            skipped += 1
-                            errors.append({"error": "missing fields", "item": item})
-                            continue
-                        try:
-                            User.create(username=username, email=email)
-                            created += 1
-                        except IntegrityError:
-                            skipped += 1
-                        except Exception as inner_exc:
-                            skipped += 1
-                            errors.append({"error": str(inner_exc), "item": item})
-                _reset_sequence(User)
-                return jsonify({
-                    "created": created,
-                    "loaded": created,
-                    "count": created,
-                    "skipped": skipped,
-                    "errors": errors,
-                }), 201
-
-        # Case C: raw CSV body (Content-Type: text/csv or fallback)
         content_type = request.content_type or ""
-        if "text/csv" in content_type or "text/plain" in content_type:
-            content = request.get_data(as_text=True)
-            if content:
-                row_count = _safe_int(request.args.get("row_count"))
-                loaded, skipped = _load_users_from_stream(content, row_count=row_count)
-                return jsonify({
-                    "created": loaded,
-                    "loaded": loaded,
-                    "count": loaded,
-                    "skipped": skipped,
-                }), 201
 
-        # Case D: form-data with filename pointing to repo CSV (legacy)
-        payload = _request_payload()
-        filename = _bulk_file_payload(payload) or "users.csv"
-        row_count = _bulk_row_count(payload)
-        loaded = _load_users_csv(_repo_csv_path(filename), row_count=row_count)
-        return _bulk_response(filename, loaded)
+        if "application/json" in content_type:
+            data = request.get_json(silent=True) or []
+            rows = data.get("users", []) if isinstance(data, dict) else data
+            for row in rows:
+                try:
+                    email = str((row or {}).get("email", "")).strip()
+                    username = str((row or {}).get("username", "")).strip()
+                    if not email or not username:
+                        skipped += 1
+                        continue
+                    _, was_created = User.get_or_create(
+                        email=email,
+                        defaults={"username": username},
+                    )
+                    if was_created:
+                        created += 1
+                    else:
+                        skipped += 1
+                except Exception:
+                    skipped += 1
+            _reset_sequence(User)
+            return jsonify({"created": created, "skipped": skipped}), 201
+
+        if "multipart/form-data" in content_type:
+            uploaded_file = request.files.get("file")
+            if not uploaded_file:
+                return jsonify({"error": "no file provided"}), 400
+            content = uploaded_file.read().decode("utf-8")
+            reader = csv.DictReader(io.StringIO(content))
+            with db_proxy.atomic():
+                for row in reader:
+                    try:
+                        email = str(row.get("email", "")).strip()
+                        username = str(row.get("username", "")).strip()
+                        if not email or not username:
+                            skipped += 1
+                            continue
+                        _, was_created = User.get_or_create(
+                            email=email,
+                            defaults={"username": username},
+                        )
+                        if was_created:
+                            created += 1
+                        else:
+                            skipped += 1
+                    except Exception:
+                        skipped += 1
+            _reset_sequence(User)
+            return jsonify({"created": created, "skipped": skipped}), 201
+
+        content = request.get_data(as_text=True)
+        reader = csv.DictReader(io.StringIO(content))
+        with db_proxy.atomic():
+            for row in reader:
+                try:
+                    email = str(row.get("email", "")).strip()
+                    username = str(row.get("username", "")).strip()
+                    if not email or not username:
+                        skipped += 1
+                        continue
+                    _, was_created = User.get_or_create(
+                        email=email,
+                        defaults={"username": username},
+                    )
+                    if was_created:
+                        created += 1
+                    else:
+                        skipped += 1
+                except Exception:
+                    skipped += 1
+        _reset_sequence(User)
+        return jsonify({"created": created, "skipped": skipped}), 201
 
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
@@ -1252,7 +1256,7 @@ def delete_event(event_id):
         if event_record is None:
             return jsonify(error="Event not found"), 404
         event_record.delete_instance()
-        return jsonify({"deleted": True}), 200
+        return jsonify({"deleted": True, "id": event_id}), 200
     except PeeweeException as exc:
         _log_db_error("delete_event", exc)
         return jsonify(error="database_error"), 500
