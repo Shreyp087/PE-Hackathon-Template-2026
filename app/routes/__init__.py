@@ -269,6 +269,16 @@ def _bulk_response(filename, loaded, status_code=201):
     return jsonify(response), status_code
 
 
+def _require_json_object_body():
+    if request.is_json:
+        raw_json = request.get_json(silent=True)
+        if raw_json is None:
+            return jsonify(error="invalid_json"), 400
+        if not isinstance(raw_json, dict):
+            return jsonify(error="request body must be a JSON object"), 400
+    return None
+
+
 # ── gauge / CSV helpers ──────────────────────────────────────────────────────
 
 def _refresh_application_gauges():
@@ -557,6 +567,9 @@ def get_user(user_id):
 
 @main.post("/users")
 def create_user():
+    invalid_body = _require_json_object_body()
+    if invalid_body is not None:
+        return invalid_body
     payload = _request_payload()
     username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
     email = str(_first_present(payload, "email", "mail") or "").strip()
@@ -607,7 +620,7 @@ def bulk_users():
 
         # Case B: JSON array or JSON object with "users" key
         raw_json = request.get_json(silent=True)
-        if raw_json is not None:
+        if request.is_json:
             users_list = None
             if isinstance(raw_json, list):
                 users_list = raw_json
@@ -618,6 +631,11 @@ def bulk_users():
                     or raw_json.get("data")
                     or raw_json.get("rows")
                 )
+            else:
+                return jsonify(error="request body must be a JSON array or object"), 400
+
+            if isinstance(raw_json, dict) and users_list is None:
+                return jsonify(error="users list is required"), 400
 
             if users_list is not None and isinstance(users_list, list):
                 created = 0
@@ -656,6 +674,7 @@ def bulk_users():
                     "created": created,
                     "skipped": skipped,
                 }), 201
+            return jsonify(error="users must be a list"), 400
 
         # Case C: raw CSV body (Content-Type: text/csv or fallback)
         content_type = request.content_type or ""
@@ -955,7 +974,7 @@ def _perform_redirect(code):
             Event.create(
                 url=url_record,
                 user=url_record.user,
-                event_type="click",
+                event_type="redirect",
                 details=_details_to_text({"ip": request.headers.get("X-Forwarded-For", request.remote_addr)}),
             )
     except PeeweeException as exc:
@@ -1240,6 +1259,9 @@ def get_event(event_id):
 
 @main.post("/events")
 def create_event():
+    invalid_body = _require_json_object_body()
+    if invalid_body is not None:
+        return invalid_body
     payload = _request_payload()
     event_type = str(_first_present(payload, "event_type", "type") or "").strip()
     if not event_type:
@@ -1256,6 +1278,8 @@ def create_event():
         user_record = None
         if user_id is not None:
             user_record = User.get_or_none(User.id == user_id)
+            if user_record is None:
+                return jsonify(error="user not found"), 404
         event_record = Event.create(
             url=url_record,
             user=user_record,
@@ -1308,7 +1332,7 @@ def bulk_events():
     try:
         # JSON array of event objects
         raw_json = request.get_json(silent=True)
-        if raw_json is not None:
+        if request.is_json:
             events_list = None
             if isinstance(raw_json, list):
                 events_list = raw_json
@@ -1319,6 +1343,11 @@ def bulk_events():
                     or raw_json.get("data")
                     or raw_json.get("rows")
                 )
+            else:
+                return jsonify(error="request body must be a JSON array or object"), 400
+
+            if isinstance(raw_json, dict) and events_list is None:
+                return jsonify(error="events list is required"), 400
 
             if events_list is not None and isinstance(events_list, list):
                 created = 0
@@ -1335,9 +1364,17 @@ def bulk_events():
                         user_id = _safe_int(
                             (item or {}).get("user_id", (item or {}).get("user"))
                         )
+                        url_record = _resolve_url_record(url_id) if url_id is not None else None
+                        if url_id is not None and url_record is None:
+                            skipped += 1
+                            continue
+                        user_record = User.get_or_none(User.id == user_id) if user_id is not None else None
+                        if user_id is not None and user_record is None:
+                            skipped += 1
+                            continue
                         Event.create(
-                            url=_resolve_url_record(url_id) if url_id is not None else None,
-                            user=User.get_or_none(User.id == user_id) if user_id is not None else None,
+                            url=url_record,
+                            user=user_record,
                             event_type=event_type,
                             details=_details_to_text(
                                 (item or {}).get("details", (item or {}).get("metadata"))
@@ -1347,6 +1384,7 @@ def bulk_events():
                     except Exception:
                         skipped += 1
                 return jsonify({"created": created, "skipped": skipped}), 201
+            return jsonify(error="events must be a list"), 400
 
         # Fallback: CSV from repo
         payload = _request_payload()
