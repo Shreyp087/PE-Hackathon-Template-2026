@@ -7,6 +7,11 @@ This document describes the REST API endpoints available in the URL Shortener se
 - `GET /r/:shortCode` - Redirect to the original URL
 - `GET /metrics` - Retrieve application metrics
 - `GET /health` - Application health check
+- `GET /system` - Retrieve CPU, memory, and disk usage snapshot
+- `GET /urls` - List latest active shortened URLs
+- `GET /urls/all` - List all shortened URLs
+- `GET /urls/:shortCode/stats` - Retrieve detailed stats for one short URL
+- `GET /logs/recent` - Retrieve recent structured logs
 - `GET /simulate/slow` - (Testing) Simulate latency
 - `GET /simulate/cpu` - (Testing) Simulate CPU spike
 
@@ -89,7 +94,7 @@ flask_http_request_duration_seconds_bucket{le="0.1"} 1200
 ---
 
 ### `GET /health`
-Returns the status of the application, ensuring it is ready to accept traffic and can properly connect to the database.
+Returns the status of the application and readiness to accept traffic.
 
 - **Method**: `GET`
 - **Path**: `/health`
@@ -102,10 +107,42 @@ curl http://localhost:5000/health
 #### Response Example (200 OK)
 ```json
 {
-  "status": "ok",
-  "database": "connected"
+  "status": "ok"
 }
 ```
+
+---
+
+### `GET /system`
+Returns current system snapshot metrics used by the homepage dashboard.
+
+- **Method**: `GET`
+- **Path**: `/system`
+
+#### Response Example (200 OK)
+```json
+{
+  "cpu_percent": 3.1,
+  "memory_total_mb": 3915.89,
+  "memory_used_mb": 767.9,
+  "memory_percent": 19.6,
+  "disk_percent": 4.3
+}
+```
+
+---
+
+### `GET /urls`
+Returns up to 50 most recent active shortened URLs.
+
+### `GET /urls/all`
+Returns all shortened URLs, newest first.
+
+### `GET /urls/:shortCode/stats`
+Returns click count and event breakdown for a short code.
+
+### `GET /logs/recent`
+Returns recent structured application logs. Optional query parameter: `limit`.
 
 ---
 

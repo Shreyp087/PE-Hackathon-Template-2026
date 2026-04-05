@@ -13,6 +13,8 @@ A production-ready URL shortener built for the MLH Production Engineering Hackat
 ## Documentation
 For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](docs/INDEX.md)**.
 
+Quick start for judges and first-time reviewers: **[Jump to Demo Flow](#demo-flow-first-time-user)**.
+
 ## Overview
 This service provides a fast, scalable way to shorten long URLs and redirect users seamlessly. It utilizes a Python Flask backend, Peewee ORM for database interactions, and PostgreSQL for robust data storage. The stack focuses on reliability, with a full monitoring suite ready for deployment on DigitalOcean.
 
@@ -36,12 +38,24 @@ Copy the example environment file.
 ```bash
 cp .env.example .env
 ```
-Ensure that `DB_HOST=localhost` if you are running the app locally outside of Docker.
+If you run the app locally (outside Docker), set:
+- `DB_HOST=localhost`
+- `DB_PORT=5432`
 
-### 3. Start PostgreSQL Database
-We provide a `docker-compose.yml` to easily spin up the required database and monitoring stack:
+If you run the app with Docker Compose, set:
+- `DB_HOST=db`
+- `DB_PORT=5432`
+- `DB_HOST_PORT=5432` (or another host port if needed)
+
+### 3. Start Services
+Start only PostgreSQL (minimal local app run):
 ```bash
 docker compose up -d db
+```
+
+Start full observability stack (recommended for Incident Response quest):
+```bash
+docker compose up -d db prometheus alertmanager discord-relay grafana
 ```
 
 ### 4. Install Dependencies
@@ -51,9 +65,14 @@ uv sync
 ```
 
 ### 5. Seed the Database
-To initialize the schema and populate the database with dummy data, use the provided CSV files (`users.csv`, `urls.csv`, `events.csv`). Run your setup or seed script (the exact file name may vary, e.g., `seed.py` or manually via python shell):
+Option A: seed from CSV files (`users.csv`, `urls.csv`, `events.csv`):
 ```bash
 uv run seed.py --users users.csv --urls urls.csv --events events.csv
+```
+
+Option B: generate synthetic data quickly:
+```bash
+uv run python scripts/fake_data.py --users 50 --urls 200 --events 2000 --days 30
 ```
 
 ### 6. Run the Server
@@ -62,6 +81,63 @@ Start the Flask application:
 uv run run.py
 ```
 The server will start locally on `http://localhost:5000`.
+
+### 7. Verify Everything Is Up
+```bash
+curl http://localhost:5000/health
+curl http://localhost:5000/metrics
+```
+
+If full stack is running, you can also open:
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- Alertmanager: `http://localhost:9093`
+
+## Demo Flow (First-Time User)
+Use this exact flow to go from setup to testing in about 10 minutes.
+
+### Terminal 1: Start the app
+```bash
+uv run run.py
+```
+
+### Terminal 2: Run a full demo sequence
+1. Health + metrics checks:
+```bash
+curl http://localhost:5000/health
+curl http://localhost:5000/system
+curl http://localhost:5000/metrics
+```
+
+2. Create and test a short URL:
+```bash
+curl -X POST http://localhost:5000/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://mlh.io/seasons/2026/events"}'
+curl -i http://localhost:5000/r/<short_code>
+```
+
+3. Run smoke tests (fast validation):
+```bash
+uv run pytest -q tests/test_smoke.py
+```
+
+4. Optional: run full test suite:
+```bash
+uv run pytest -q
+```
+
+5. Optional incident-response demo:
+```bash
+uv run python scripts/watch_alerts.py
+uv run python scripts/simulate.py
+```
+
+### Where to go next
+- Testing and simulation details: [docs/SIMULATION.md](docs/SIMULATION.md)
+- Alert triage steps: [RUNBOOK.md](RUNBOOK.md)
+- API endpoint reference: [docs/API.md](docs/API.md)
+- Troubleshooting common issues: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## Quick Start Example
 Test the URL shortener endpoint via `curl`:

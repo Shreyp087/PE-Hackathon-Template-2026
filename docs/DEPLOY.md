@@ -347,5 +347,5 @@ docker compose logs --tail=100 discord-relay
 - Validate DB-backed routes explicitly after updates (`/urls`, `/shorten`).
 
 3. GitHub Actions behavior
-- Workflow in `.github/workflows/deploy.yml` is CI smoke testing, not production deployment.
+- Workflow in `.github/workflows/ci.yml` is CI smoke testing, not production deployment.
 - Keep deployment as an explicit manual/ops step (or add a separate release workflow).

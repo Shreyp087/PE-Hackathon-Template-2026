@@ -3,7 +3,7 @@
 A production-ready URL shortener built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
 
 ## Documentation
-For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](docs/INDEX.md)**.
+For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](INDEX.md)**.
 
 ## Overview
 This service provides a fast, scalable way to shorten long URLs and redirect users seamlessly. It utilizes a Python Flask backend, Peewee ORM for database interactions, and PostgreSQL for robust data storage. The stack focuses on reliability, with a full monitoring suite ready for deployment on DigitalOcean.

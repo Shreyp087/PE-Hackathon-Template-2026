@@ -1,21 +1,39 @@
 # Environment Configuration
 
-Reference this guide to appropriately define application environments through secrets securely. Configure these keys directly within your `.env` repository root context.
+Use this guide to configure the `.env` file at the repository root.
 
-| Name | Description | Example Value | Required/Optional |
-|------|-------------|---------------|-------------------|
-| `DATABASE_URL` | The fully qualified connection string for pointing directly to the PostgreSQL database in lieu of separated constants. | `postgresql://user:pass@db:5432/hackathon` | Optional |
-| `DB_NAME` | Explicit name of the active PostgreSQL database instance mapped to peewee. | `hackathon_db` | Required |
-| `DB_USER` | Targeted database system username payload. | `postgres` | Required |
-| `DB_PASSWORD` | Encrypted or plain superuser operational password to process database operations. | `supersecret` | Required |
-| `DB_HOST` | Network hostname of the database server instances. | `db` (docker) or `localhost` (local) | Required |
-| `SECRET_KEY` | Cryptographic secret utilized by Flask mapping HTTP sessions / verifying signed cookies tightly. | `c87s9d...` | Required |
-| `REDIS_URL` | System connection URI connecting a Redis in-memory storage cluster (for eventual scalability & aggressive URL mapping caches). | `redis://redis:6379/1` | Optional |
-| `PORT` | Network port mapped against the Flask listener. | `5000` | Optional |
-| `LOG_LEVEL` | Enforced verbosity filter of python logging pipeline. (DEBUG, INFO, WARNING, ERROR). | `INFO` | Optional |
-| `PROMETHEUS_PORT` | Exposure mapped network port binding exactly to the Prometheus scraping engine interfaces. | `9090` | Optional |
-| `ALLOWED_HOSTS` | Security restriction representing a comma-separated whitelist limiting incoming `Host:` headers the load balancer routes explicitly. | `123.45.67.89,api.shortener.example` | Optional |
-| `DEBUG` / `FLASK_DEBUG` | Enables native stack traceback output and hot-reloading file changes. **Warning: Must be evaluated explicitly as `false` in production!** | `false` | Required |
-| `DISCORD_WEBHOOK_URL`| Remote Alertmanager callback destination webhook firing if monitoring thresholds report a system outage or unhandled application disruption. | `https://discord.com/api/web...` | Optional |
-| `GUNICORN_WORKERS` | Orchestrates the total amount of parallel Gunicorn WSGI Python workers to spawn securely. | `4` | Optional (Defaults to 1) |
-| `DB_HOST_PORT` | Allocates the explicit mapping for exposing the local host port resolving to the Postgres container internally. | `5432` | Optional |
+## Required Variables
+
+| Name | Description | Example Value |
+|------|-------------|---------------|
+| `DB_NAME` | PostgreSQL database name used by the app. | `hackathon_db` |
+| `DB_USER` | PostgreSQL username. | `postgres` |
+| `DB_PASSWORD` | PostgreSQL password. | `postgres` |
+| `DB_HOST` | Database host: `localhost` for local app runtime, `db` for docker-compose runtime. | `localhost` |
+| `DB_PORT` | Database port (container internal). | `5432` |
+
+## Optional Variables
+
+| Name | Description | Example Value |
+|------|-------------|---------------|
+| `FLASK_DEBUG` | Enables Flask debug mode. Use `false` in production. | `true` |
+| `DISCORD_WEBHOOK_URL` | Discord webhook used by the `discord-relay` service for alert notifications. | `https://discord.com/api/webhooks/...` |
+| `DB_HOST_PORT` | Host port mapped to Postgres in `docker-compose.yml`. Only needed when changing host mapping. | `5432` |
+| `GUNICORN_WORKERS` | Number of Gunicorn workers for production container runtime. | `2` |
+| `APP_IMAGE` | Image override used in deployment/rollback workflows. | `url-shortener:rollback` |
+
+## Recommended Profiles
+
+Local app + Docker DB:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+Docker Compose app + Docker DB:
+
+```env
+DB_HOST=db
+DB_PORT=5432
+```
