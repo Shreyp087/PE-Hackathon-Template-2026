@@ -11,7 +11,8 @@ from pathlib import Path
 
 from dateutil.parser import parse as parse_datetime
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
-from peewee import IntegrityError, PeeweeException, fn
+from peewee import ForeignKeyField, IntegrityError, PeeweeException, fn
+from playhouse.shortcuts import model_to_dict
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.database import db_proxy
@@ -33,11 +34,14 @@ SHORT_CODE_MAX_ATTEMPTS = 64
 
 def list_response(items, total=None):
     """Standard list envelope expected by the grader."""
+    serialized = [
+        serialize(item) if not isinstance(item, dict) else item
+        for item in list(items)
+    ]
     return jsonify({
         "kind": "list",
-        "sample": items,
-        "total_items": total if total is not None else len(items),
-        "location": None,
+        "sample": serialized,
+        "total_items": total if total is not None else len(serialized),
     })
 
 
@@ -119,45 +123,49 @@ def _generate_short_code():
 
 # ── serializers ──────────────────────────────────────────────────────────────
 
+def _normalize_serialized_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def serialize(instance, extra=None):
+    payload = model_to_dict(instance, recurse=False)
+    normalized = {}
+    for field_name, value in payload.items():
+        field = instance._meta.fields.get(field_name)
+        target_key = field_name
+        if isinstance(field, ForeignKeyField):
+            target_key = field.column_name or f"{field_name}_id"
+        normalized[target_key] = _normalize_serialized_value(value)
+
+    if extra:
+        normalized.update(extra)
+    return normalized
+
+
 def _serialize_user(user_record):
-    return {
-        "id": user_record.id,
-        "username": user_record.username,
-        "email": user_record.email,
-        "created_at": user_record.created_at.isoformat() if user_record.created_at else None,
-    }
+    return serialize(user_record)
 
 
-def _serialize_url(url_record):
-    try:
-        short_url = url_for("main.redirect_short_code", code=url_record.short_code, _external=True)
-    except Exception:
-        short_url = f"/r/{url_record.short_code}"
-    return {
-        "id": url_record.id,
-        "user_id": url_record.user_id,
-        "short_code": url_record.short_code,
-        "original_url": url_record.original_url,
-        "title": url_record.title,
-        "created_at": url_record.created_at.isoformat() if url_record.created_at else None,
-        "updated_at": url_record.updated_at.isoformat() if url_record.updated_at else None,
-        "is_active": url_record.is_active,
-        "click_count": url_record.click_count,
-        "redirect_target": url_record.original_url,
-        "short_url": short_url,
-    }
+def _serialize_url(url_record, include_short_url=False):
+    extra = {}
+    if include_short_url:
+        try:
+            extra["short_url"] = url_for(
+                "main.redirect_short_code",
+                code=url_record.short_code,
+                _external=True,
+            )
+        except Exception:
+            extra["short_url"] = f"/r/{url_record.short_code}"
+    return serialize(url_record, extra or None)
 
 
 def _serialize_event(event_record):
-    return {
-        "id": event_record.id,
-        "url_id": event_record.url_id,
-        "user_id": event_record.user_id,
-        "event_type": event_record.event_type,
-        "timestamp": event_record.timestamp.isoformat() if event_record.timestamp else None,
-        "details": _serialize_details(event_record.details),
-        "location": None,
-    }
+    payload = serialize(event_record)
+    payload["details"] = _serialize_details(event_record.details)
+    return payload
 
 
 # ── pagination ───────────────────────────────────────────────────────────────
@@ -165,10 +173,8 @@ def _serialize_event(event_record):
 def _paginate_query(query):
     """Returns (paginated_query, total_count).  total_count is the FULL count before pagination."""
     page = max(_safe_int(request.args.get("page"), 1), 1)
-    per_page = _safe_int(request.args.get("per_page"))
+    per_page = _safe_int(request.args.get("per_page"), 20)
     total = query.count()
-    if per_page is None:
-        return query, total
     per_page = max(1, min(per_page, 500))
     return query.paginate(page, per_page), total
 
@@ -518,6 +524,10 @@ def list_users():
         if email:
             query = query.where(User.email == email)
 
+        username = request.args.get("username")
+        if username:
+            query = query.where(User.username == username)
+
         items, total = _paginate_query(query)
         return list_response([_serialize_user(u) for u in items], total), 200
     except PeeweeException as exc:
@@ -543,24 +553,25 @@ def create_user():
     username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
     email = str(_first_present(payload, "email", "mail") or "").strip()
 
-    # Return 400 for missing fields (grader expects 400 for bad request)
-    if not username and not email:
-        return jsonify(error="username and email are required"), 400
     if not username:
-        return jsonify(error="missing required field: username"), 422
+        return jsonify(error="username is required"), 422
     if not email:
-        return jsonify(error="missing required field: email"), 422
+        return jsonify(error="email is required"), 422
 
     try:
+        if User.select().where(User.email == email).exists():
+            return jsonify(error="A user with this email already exists"), 409
+        if User.select().where(User.username == username).exists():
+            return jsonify(error="A user with this username already exists"), 409
         user_record = User.create(username=username, email=email)
         return jsonify(_serialize_user(user_record)), 201
     except IntegrityError as exc:
         err_msg = str(exc).lower()
         if "email" in err_msg:
-            return jsonify(error="email already exists"), 409
+            return jsonify(error="A user with this email already exists"), 409
         if "username" in err_msg:
-            return jsonify(error="username already exists"), 409
-        return jsonify(error="user already exists"), 409
+            return jsonify(error="A user with this username already exists"), 409
+        return jsonify(error="A user with this username already exists"), 409
     except PeeweeException as exc:
         _log_db_error("create_user", exc)
         return jsonify(error="database_error"), 500
@@ -664,17 +675,23 @@ def update_user(user_id):
             return jsonify(error="user not found"), 404
 
         if _first_present(payload, "username", "user_name", "name") is not None:
-            user_record.username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
+            username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
+            if username and User.select().where((User.username == username) & (User.id != user_record.id)).exists():
+                return jsonify(error="A user with this username already exists"), 409
+            user_record.username = username
         if _first_present(payload, "email", "mail") is not None:
-            user_record.email = str(_first_present(payload, "email", "mail") or "").strip()
+            email = str(_first_present(payload, "email", "mail") or "").strip()
+            if email and User.select().where((User.email == email) & (User.id != user_record.id)).exists():
+                return jsonify(error="A user with this email already exists"), 409
+            user_record.email = email
         user_record.save()
         return jsonify(_serialize_user(user_record)), 200
     except IntegrityError as exc:
         err_msg = str(exc).lower()
         if "email" in err_msg:
-            return jsonify(error="email already exists"), 409
+            return jsonify(error="A user with this email already exists"), 409
         if "username" in err_msg:
-            return jsonify(error="username already exists"), 409
+            return jsonify(error="A user with this username already exists"), 409
         return jsonify(error="duplicate value"), 409
     except PeeweeException as exc:
         _log_db_error("update_user", exc)
@@ -812,7 +829,7 @@ def shorten_url():
         "url_shortened",
         extra={"short_code": url_record.short_code, "original": original_url},
     )
-    return jsonify(_serialize_url(url_record)), 201
+    return jsonify(_serialize_url(url_record, include_short_url=True)), 201
 
 
 @main.post("/urls")
@@ -832,6 +849,8 @@ def create_url():
         return jsonify(error="invalid_url"), 400
 
     try:
+        if user_id is not None and User.get_or_none(User.id == user_id) is None:
+            return jsonify(error="user not found"), 404
         url_record = _create_url_record(
             original_url,
             title=title,
@@ -1036,8 +1055,8 @@ def update_url(url_id):
         if _first_present(payload, "user_id", "user") is not None:
             user_id = _safe_int(_first_present(payload, "user_id", "user"))
             url_record.user = User.get_or_none(User.id == user_id) if user_id is not None else None
-        if _first_present(payload, "short_code") is not None:
-            url_record.short_code = str(_first_present(payload, "short_code")).strip()
+        if _first_present(payload, "short_code", "shortCode") is not None:
+            url_record.short_code = str(_first_present(payload, "short_code", "shortCode") or "").strip()
         url_record.save()
         _refresh_application_gauges()
         return jsonify(_serialize_url(url_record)), 200
@@ -1201,9 +1220,19 @@ def create_event():
     try:
         url_id = _safe_int(_first_present(payload, "url_id", "url"))
         user_id = _safe_int(_first_present(payload, "user_id", "user"))
+        url_record = None
+        if url_id is not None:
+            url_record = URL.get_or_none(URL.id == url_id)
+            if url_record is None:
+                return jsonify(error="URL not found"), 404
+        user_record = None
+        if user_id is not None:
+            user_record = User.get_or_none(User.id == user_id)
+            if user_record is None:
+                return jsonify(error="user not found"), 404
         event_record = Event.create(
-            url=URL.get_or_none(URL.id == url_id) if url_id is not None else None,
-            user=User.get_or_none(User.id == user_id) if user_id is not None else None,
+            url=url_record,
+            user=user_record,
             event_type=event_type,
             details=_details_to_text(_first_present(payload, "details", "metadata", "meta", "payload")),
         )
@@ -1218,7 +1247,7 @@ def delete_event(event_id):
     try:
         event_record = Event.get_or_none(Event.id == event_id)
         if event_record is None:
-            return "", 204
+            return jsonify(error="event not found"), 404
         event_record.delete_instance()
         return jsonify({"deleted": True}), 200
     except PeeweeException as exc:
@@ -1238,26 +1267,9 @@ def events_stats():
                 .tuples()
             )
         }
-        # Top 10 URLs by event count
-        by_url = []
-        try:
-            top_urls = (
-                Event.select(Event.url_id, fn.COUNT(Event.id).alias("count"))
-                .where(Event.url_id.is_null(False))
-                .group_by(Event.url_id)
-                .order_by(fn.COUNT(Event.id).desc())
-                .limit(10)
-                .tuples()
-            )
-            by_url = [{"url_id": uid, "count": cnt} for uid, cnt in top_urls]
-        except Exception:
-            pass
-
         return jsonify({
             "total": total,
-            "total_events": total,
             "by_type": by_type,
-            "by_url": by_url,
         }), 200
     except PeeweeException as exc:
         _log_db_error("events_stats", exc)

@@ -64,8 +64,9 @@ async function refreshUrls() {
   try {
     const response = await fetch("/urls");
     const payload = await response.json();
+    const urls = Array.isArray(payload) ? payload : payload?.sample;
 
-    if (!Array.isArray(payload) || payload.length === 0) {
+    if (!Array.isArray(urls) || urls.length === 0) {
       recentUrlsBody.innerHTML = `
         <tr>
           <td colspan="5" class="empty-state">No active URLs yet. Create one above to start generating traffic.</td>
@@ -74,7 +75,7 @@ async function refreshUrls() {
       return;
     }
 
-    recentUrlsBody.innerHTML = payload
+    recentUrlsBody.innerHTML = urls
       .map(
         (urlRecord) => `
           <tr>
