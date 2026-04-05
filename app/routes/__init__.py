@@ -9,7 +9,7 @@ from pathlib import Path
 
 from dateutil.parser import parse as parse_datetime
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
-from peewee import DoesNotExist, PeeweeException, fn
+from peewee import IntegrityError, PeeweeException, fn
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.database import db_proxy
@@ -145,6 +145,19 @@ def _paginate(query):
         return query
     per_page = max(1, min(per_page, 500))
     return query.paginate(page, per_page)
+
+
+def _bulk_file_payload(payload):
+    return payload.get("filename") or payload.get("file")
+
+
+def _bulk_row_count(payload):
+    return (
+        _safe_int(payload.get("row_count"))
+        or _safe_int(payload.get("rowcount"))
+        or _safe_int(payload.get("count"))
+        or _safe_int(payload.get("rows"))
+    )
 
 
 def _refresh_application_gauges():
@@ -381,6 +394,8 @@ def create_user():
     try:
         user_record = User.create(username=username, email=email)
         return jsonify(_serialize_user(user_record)), 201
+    except IntegrityError:
+        return jsonify(error="user already exists"), 409
     except PeeweeException as exc:
         _log_db_error("create_user", exc)
         return jsonify(error="database_error"), 500
@@ -389,14 +404,14 @@ def create_user():
 @main.post("/users/bulk")
 def bulk_users():
     payload = request.get_json(silent=True) or {}
-    filename = payload.get("filename")
-    row_count = _safe_int(payload.get("row_count"))
+    filename = _bulk_file_payload(payload)
+    row_count = _bulk_row_count(payload)
     if not filename:
         return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_users_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name), 201
+        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
@@ -439,11 +454,33 @@ def delete_user(user_id):
         return jsonify(error="database_error"), 500
 
 
-def _create_url_record(original_url, title=None, user_id=None):
+@main.get("/users/<int:user_id>/urls")
+def list_urls_for_user(user_id):
+    try:
+        query = URL.select().where(URL.user_id == user_id).order_by(URL.id)
+        query = _paginate(query)
+        return jsonify([_serialize_url(url_record) for url_record in query]), 200
+    except PeeweeException as exc:
+        _log_db_error("list_urls_for_user", exc)
+        return jsonify(error="database_error"), 500
+
+
+@main.get("/users/<int:user_id>/events")
+def list_events_for_user(user_id):
+    try:
+        query = Event.select().where(Event.user_id == user_id).order_by(Event.id)
+        query = _paginate(query)
+        return jsonify([_serialize_event(event_record) for event_record in query]), 200
+    except PeeweeException as exc:
+        _log_db_error("list_events_for_user", exc)
+        return jsonify(error="database_error"), 500
+
+
+def _create_url_record(original_url, title=None, user_id=None, short_code=None):
     user_record = None
     if user_id is not None:
         user_record = User.get_or_none(User.id == user_id)
-    short_code = _generate_short_code()
+    short_code = str(short_code or "").strip() or _generate_short_code()
     url_record = URL.create(
         short_code=short_code,
         original_url=original_url,
@@ -468,7 +505,13 @@ def shorten_url():
         return jsonify(error="invalid_url"), 400
 
     try:
-        url_record = _create_url_record(original_url, user_id=_safe_int(payload.get("user_id")))
+        url_record = _create_url_record(
+            original_url,
+            user_id=_safe_int(payload.get("user_id")),
+            short_code=payload.get("short_code"),
+        )
+    except IntegrityError:
+        return jsonify(error="short_code already exists"), 409
     except PeeweeException as exc:
         _log_db_error("create_url", exc)
         return jsonify(error="database_error"), 500
@@ -491,10 +534,19 @@ def create_url():
     user_id = _safe_int(payload.get("user_id"))
     if not original_url:
         return jsonify(error="original_url is required"), 400
+    if not (original_url.startswith("http://") or original_url.startswith("https://")):
+        return jsonify(error="invalid_url"), 400
 
     try:
-        url_record = _create_url_record(original_url, title=title, user_id=user_id)
+        url_record = _create_url_record(
+            original_url,
+            title=title,
+            user_id=user_id,
+            short_code=payload.get("short_code"),
+        )
         return jsonify(_serialize_url(url_record)), 201
+    except IntegrityError:
+        return jsonify(error="short_code already exists"), 409
     except PeeweeException as exc:
         _log_db_error("create_url_rest", exc)
         return jsonify(error="database_error"), 500
@@ -506,14 +558,14 @@ def create_url():
 @main.post("/urls/bulk")
 def bulk_urls():
     payload = request.get_json(silent=True) or {}
-    filename = payload.get("filename")
-    row_count = _safe_int(payload.get("row_count"))
+    filename = _bulk_file_payload(payload)
+    row_count = _bulk_row_count(payload)
     if not filename:
         return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_urls_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name), 201
+        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
@@ -521,8 +573,7 @@ def bulk_urls():
         return jsonify(error="database_error"), 500
 
 
-@main.get("/r/<code>")
-def redirect_short_code(code):
+def _perform_redirect(code):
     try:
         url_record = URL.get_or_none((URL.short_code == code) & (URL.is_active == True))
         if url_record is None:
@@ -547,6 +598,16 @@ def redirect_short_code(code):
         extra={"short_code": url_record.short_code, "original_url": url_record.original_url},
     )
     return redirect(url_record.original_url, code=302)
+
+
+@main.get("/r/<code>")
+def redirect_short_code(code):
+    return _perform_redirect(code)
+
+
+@main.get("/urls/<code>/redirect")
+def redirect_short_code_alias(code):
+    return _perform_redirect(code)
 
 
 @main.get("/urls")
@@ -625,6 +686,29 @@ def delete_url(url_id):
         return "", 204
     except PeeweeException as exc:
         _log_db_error("delete_url", exc)
+        return jsonify(error="database_error"), 500
+
+
+@main.get("/urls/<int:url_id>/events")
+def list_events_for_url(url_id):
+    try:
+        query = Event.select().where(Event.url_id == url_id).order_by(Event.id)
+        query = _paginate(query)
+        return jsonify([_serialize_event(event_record) for event_record in query]), 200
+    except PeeweeException as exc:
+        _log_db_error("list_events_for_url", exc)
+        return jsonify(error="database_error"), 500
+
+
+@main.get("/urls/<int:url_id>/stats")
+def url_stats_by_id(url_id):
+    try:
+        url_record = URL.get_or_none(URL.id == url_id)
+        if url_record is None:
+            return jsonify(error="url not found"), 404
+        return url_stats(url_record.short_code)
+    except PeeweeException as exc:
+        _log_db_error("url_stats_by_id", exc)
         return jsonify(error="database_error"), 500
 
 
@@ -713,14 +797,14 @@ def create_event():
 @main.post("/events/bulk")
 def bulk_events():
     payload = request.get_json(silent=True) or {}
-    filename = payload.get("filename")
-    row_count = _safe_int(payload.get("row_count"))
+    filename = _bulk_file_payload(payload)
+    row_count = _bulk_row_count(payload)
     if not filename:
         return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_events_csv(_repo_csv_path(filename), row_count=row_count)
-        return jsonify(loaded=loaded, filename=Path(filename).name), 201
+        return jsonify(loaded=loaded, filename=Path(filename).name, file=Path(filename).name), 201
     except FileNotFoundError as exc:
         return jsonify(error=str(exc)), 404
     except PeeweeException as exc:
