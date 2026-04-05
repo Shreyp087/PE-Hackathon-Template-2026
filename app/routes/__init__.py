@@ -1,3 +1,4 @@
+import ast
 import csv
 import json
 import logging
@@ -167,7 +168,12 @@ def _request_payload():
                 if isinstance(decoded, dict):
                     merged.update(decoded)
             except (TypeError, ValueError):
-                pass
+                try:
+                    decoded = ast.literal_eval(raw_body)
+                    if isinstance(decoded, dict):
+                        merged.update(decoded)
+                except (ValueError, SyntaxError):
+                    pass
 
     return merged
 
@@ -447,10 +453,8 @@ def create_user():
 @main.post("/users/bulk")
 def bulk_users():
     payload = _request_payload()
-    filename = _bulk_file_payload(payload)
+    filename = _bulk_file_payload(payload) or "users.csv"
     row_count = _bulk_row_count(payload)
-    if not filename:
-        return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_users_csv(_repo_csv_path(filename), row_count=row_count)
@@ -601,10 +605,8 @@ def create_url():
 @main.post("/urls/bulk")
 def bulk_urls():
     payload = _request_payload()
-    filename = _bulk_file_payload(payload)
+    filename = _bulk_file_payload(payload) or "urls.csv"
     row_count = _bulk_row_count(payload)
-    if not filename:
-        return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_urls_csv(_repo_csv_path(filename), row_count=row_count)
@@ -852,10 +854,8 @@ def create_event():
 @main.post("/events/bulk")
 def bulk_events():
     payload = _request_payload()
-    filename = _bulk_file_payload(payload)
+    filename = _bulk_file_payload(payload) or "events.csv"
     row_count = _bulk_row_count(payload)
-    if not filename:
-        return jsonify(error="filename is required"), 400
 
     try:
         loaded = _load_events_csv(_repo_csv_path(filename), row_count=row_count)
