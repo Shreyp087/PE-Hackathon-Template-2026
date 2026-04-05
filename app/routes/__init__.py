@@ -173,7 +173,9 @@ def _serialize_url(url_record, include_short_url=False):
 
 
 def _serialize_event(event_record):
-    return serialize(event_record)
+    payload = serialize(event_record)
+    payload["details"] = _serialize_details(payload.get("details"))
+    return payload
 
 
 # ── pagination ───────────────────────────────────────────────────────────────
@@ -1018,8 +1020,12 @@ def _perform_redirect(code):
             Event.create(
                 url=url_record,
                 user=url_record.user,
-                event_type="redirect",
-                details=_details_to_text({"ip": request.headers.get("X-Forwarded-For", request.remote_addr)}),
+                event_type="click",
+                details=_details_to_text({
+                    "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+                    "short_code": url_record.short_code,
+                    "original_url": url_record.original_url,
+                }),
             )
     except PeeweeException as exc:
         _log_db_error("redirect", exc)
