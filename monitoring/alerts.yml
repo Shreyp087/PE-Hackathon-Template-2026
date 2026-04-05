@@ -8,8 +8,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: URL Shortener is DOWN
-          description: The Prometheus scrape target for the URL Shortener has been unavailable for at least one minute.
+          summary: Link-Shrink is DOWN
+          description: The Prometheus scrape target for Link-Shrink has been unavailable for at least one minute.
 
       - alert: HighErrorRate
         expr: (sum(rate(http_requests_total{status=~"[45].."}[2m])) / sum(rate(http_requests_total[2m]))) > 0.05
@@ -36,4 +36,4 @@ groups:
           severity: warning
         annotations:
           summary: High CPU usage
-          description: CPU utilization for the URL Shortener has remained above 90 percent for at least two minutes.
+          description: CPU utilization for Link-Shrink has remained above 90 percent for at least two minutes.

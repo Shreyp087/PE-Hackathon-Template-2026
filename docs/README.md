@@ -1,4 +1,4 @@
-# URL Shortener — MLH PE Hackathon 2026
+# Link-Shrink — MLH PE Hackathon 2026
 
 A production-ready URL shortener built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
 

@@ -1,4 +1,4 @@
-# URL Shortener Incident Response Runbook
+# Link-Shrink Incident Response Runbook
 
 ## Service Overview
 The stack has five primary components: the Flask URL shortener app, PostgreSQL for persistence, Prometheus for scraping and alert evaluation, Grafana for dashboards, and Alertmanager for routing notifications to Discord. Use `127.0.0.1` instead of `localhost` on Windows when browser or curl requests to `localhost` prefer IPv6 and fail.
