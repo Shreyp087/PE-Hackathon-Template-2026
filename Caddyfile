@@ -1,6 +1,6 @@
 link-shrink.duckdns.org {
     # Route Grafana to the sub-path
-    handle_path /grafana/* {
+    handle /grafana* {
         reverse_proxy grafana:3000
     }
     
