@@ -255,6 +255,31 @@ def _first_present(payload, *keys):
     return None
 
 
+def _field_present(payload, *keys):
+    return any(key in payload for key in keys)
+
+
+def _is_string_like(value):
+    return isinstance(value, str)
+
+
+def _is_int_like(value):
+    if value is None or value == "":
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return True
+        if stripped[0] in {"+", "-"}:
+            return stripped[1:].isdigit()
+        return stripped.isdigit()
+    return False
+
+
 def _bulk_response(filename, loaded, status_code=201):
     file_name = Path(filename).name
     response = {
@@ -571,6 +596,14 @@ def create_user():
     if invalid_body is not None:
         return invalid_body
     payload = _request_payload()
+    if _field_present(payload, "username", "user_name", "name"):
+        raw_username = _first_present(payload, "username", "user_name", "name")
+        if raw_username is not None and not _is_string_like(raw_username):
+            return jsonify(error="username must be a string"), 422
+    if _field_present(payload, "email", "mail"):
+        raw_email = _first_present(payload, "email", "mail")
+        if raw_email is not None and not _is_string_like(raw_email):
+            return jsonify(error="email must be a string"), 422
     username = str(_first_present(payload, "username", "user_name", "name") or "").strip()
     email = str(_first_present(payload, "email", "mail") or "").strip()
 
@@ -641,6 +674,17 @@ def bulk_users():
                 created = 0
                 skipped = 0
                 for item in users_list:
+                    if not isinstance(item, dict):
+                        skipped += 1
+                        continue
+                    raw_username = _first_present(item, "username", "user_name", "name")
+                    raw_email = _first_present(item, "email", "mail")
+                    if raw_username is not None and not _is_string_like(raw_username):
+                        skipped += 1
+                        continue
+                    if raw_email is not None and not _is_string_like(raw_email):
+                        skipped += 1
+                        continue
                     username = str((item or {}).get("username", "")).strip()
                     email = str((item or {}).get("email", "")).strip()
                     if not username or not email:
@@ -1263,6 +1307,21 @@ def create_event():
     if invalid_body is not None:
         return invalid_body
     payload = _request_payload()
+    raw_event_type = _first_present(payload, "event_type", "type")
+    if raw_event_type is not None and not _is_string_like(raw_event_type):
+        return jsonify(error="event_type must be a string"), 400
+    if _field_present(payload, "url_id", "url") and not _is_int_like(_first_present(payload, "url_id", "url")):
+        return jsonify(error="url_id must be an integer"), 400
+    if _field_present(payload, "user_id", "user") and not _is_int_like(_first_present(payload, "user_id", "user")):
+        return jsonify(error="user_id must be an integer"), 400
+    if _field_present(payload, "metadata", "meta", "payload"):
+        raw_structured = _first_present(payload, "metadata", "meta", "payload")
+        if raw_structured is not None and not isinstance(raw_structured, (dict, list)):
+            return jsonify(error="metadata must be an object or array"), 400
+    if _field_present(payload, "details"):
+        raw_details = payload.get("details")
+        if raw_details is not None and not isinstance(raw_details, (str, dict, list)):
+            return jsonify(error="details must be a string, object, or array"), 400
     event_type = str(_first_present(payload, "event_type", "type") or "").strip()
     if not event_type:
         return jsonify(error="event_type is required"), 400
@@ -1353,6 +1412,29 @@ def bulk_events():
                 created = 0
                 skipped = 0
                 for item in events_list:
+                    if not isinstance(item, dict):
+                        skipped += 1
+                        continue
+                    raw_event_type = _first_present(item, "event_type", "type")
+                    if raw_event_type is not None and not _is_string_like(raw_event_type):
+                        skipped += 1
+                        continue
+                    if _field_present(item, "url_id", "url") and not _is_int_like(_first_present(item, "url_id", "url")):
+                        skipped += 1
+                        continue
+                    if _field_present(item, "user_id", "user") and not _is_int_like(_first_present(item, "user_id", "user")):
+                        skipped += 1
+                        continue
+                    if _field_present(item, "metadata", "meta", "payload"):
+                        raw_structured = _first_present(item, "metadata", "meta", "payload")
+                        if raw_structured is not None and not isinstance(raw_structured, (dict, list)):
+                            skipped += 1
+                            continue
+                    if _field_present(item, "details"):
+                        raw_details = item.get("details")
+                        if raw_details is not None and not isinstance(raw_details, (str, dict, list)):
+                            skipped += 1
+                            continue
                     event_type = str((item or {}).get("event_type", "") or (item or {}).get("type", "")).strip()
                     if not event_type:
                         skipped += 1
