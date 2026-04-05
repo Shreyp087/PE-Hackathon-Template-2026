@@ -334,6 +334,53 @@ class TestUrlsAdvanced:
 
         assert after_redirect_events == before_redirect_events
 
+    def test_short_redirect_endpoint_creates_redirect_event(self):
+        """GET /r/<code> should also record a redirect event automatically."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/r-endpoint-redirect",
+            "title": "Short Redirect URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        redirect_resp = c.get(f"/r/{short_code}", follow_redirects=False)
+        assert redirect_resp.status_code == 302
+
+        events_resp = c.get(f"/events?short_code={short_code}&event_type=redirect")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert all(event["event_type"] == "redirect" for event in items)
+
+    def test_inactive_url_redirect_does_not_increment_click_count(self):
+        """Inactive URLs should not increment click_count through redirect endpoints."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/inactive-click-count",
+            "title": "Inactive Click Count URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        initial_url = c.get(f"/urls/{created_url['id']}").get_json()
+        assert initial_url["click_count"] == 0
+
+        deactivate_resp = c.put(f"/urls/{created_url['id']}", json={"is_active": False})
+        assert deactivate_resp.status_code == 200
+
+        redirect_resp = c.get(f"/r/{short_code}", follow_redirects=False)
+        assert redirect_resp.status_code == 404
+
+        after_url = c.get(f"/urls/{created_url['id']}").get_json()
+        assert after_url["click_count"] == 0
+
 
 # ══════════════════════════════════════════════════════════════
 # EVENTS
@@ -459,6 +506,73 @@ class TestEventsAdvanced:
 
         assert items
         assert all(event["event_type"] == "click" for event in items)
+
+    def test_events_by_redirect_type_returns_only_redirect_matches(self):
+        """GET /events?event_type=redirect should not include click events."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/exact-redirect-type",
+            "title": "Exact Redirect Type URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        manual_event_resp = c.post("/events", json={
+            "event_type": "click",
+            "url_id": created_url["id"],
+            "user_id": 1,
+            "details": "manual_click_for_redirect_filter",
+        })
+        assert manual_event_resp.status_code == 201
+
+        redirect_resp = c.get(f"/r/{short_code}", follow_redirects=False)
+        assert redirect_resp.status_code == 302
+
+        events_resp = c.get(f"/events?event_type=redirect&short_code={short_code}")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert all(event["event_type"] == "redirect" for event in items)
+
+    def test_create_event_rejects_json_string_body(self):
+        """POST /events should reject a JSON string instead of an object."""
+        c = _client()
+        r = c.post(
+            "/events",
+            data='"not-an-object"',
+            content_type="application/json",
+        )
+        assert r.status_code == 400
+        body = r.get_json()
+        assert "error" in body
+
+    def test_create_event_rejects_json_array_body(self):
+        """POST /events should reject a JSON array instead of an object."""
+        c = _client()
+        r = c.post(
+            "/events",
+            json=[{"event_type": "click", "url_id": 1}],
+        )
+        assert r.status_code == 400
+        body = r.get_json()
+        assert "error" in body
+
+    def test_create_event_nonexistent_user_returns_404(self):
+        """POST /events with nonexistent user_id should return 404."""
+        c = _client()
+        r = c.post("/events", json={
+            "event_type": "click",
+            "url_id": 1,
+            "user_id": 999999,
+            "details": "missing_user",
+        })
+        assert r.status_code == 404
+        body = r.get_json()
+        assert "error" in body
 
     def test_bulk_events_csv_upload(self):
         """POST /events/bulk with CSV file upload."""
