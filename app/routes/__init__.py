@@ -839,7 +839,11 @@ def list_events_for_user(user_id):
         user_record = User.get_or_none(User.id == user_id)
         if user_record is None:
             return jsonify(error="user not found"), 404
-        query = Event.select().where(Event.user_id == user_id).order_by(Event.id)
+        query = (
+            Event.select()
+            .where(Event.user_id == user_id)
+            .order_by(Event.timestamp.desc(), Event.id.desc())
+        )
         items, total = _paginate_query(query)
         return list_response([_serialize_event(e) for e in items], total), 200
     except PeeweeException as exc:
@@ -1190,7 +1194,11 @@ def delete_url(url_id):
 @main.get("/urls/<int:url_id>/events")
 def list_events_for_url(url_id):
     try:
-        query = Event.select().where(Event.url_id == url_id).order_by(Event.id)
+        query = (
+            Event.select()
+            .where(Event.url_id == url_id)
+            .order_by(Event.timestamp.desc(), Event.id.desc())
+        )
         items, total = _paginate_query(query)
         return list_response([_serialize_event(e) for e in items], total), 200
     except PeeweeException as exc:
@@ -1249,7 +1257,7 @@ def _build_url_stats_response(url_record):
 @main.get("/events")
 def list_events():
     try:
-        query = Event.select().order_by(Event.id)
+        query = Event.select().order_by(Event.timestamp.desc(), Event.id.desc())
 
         url_id = _safe_int(_first_present(request.args, "url_id", "url"))
         if url_id is not None:
@@ -1261,7 +1269,13 @@ def list_events():
 
         event_type = _first_present(request.args, "event_type", "type")
         if event_type:
-            query = query.where(Event.event_type == str(event_type).strip())
+            normalized_event_type = str(event_type).strip().lower()
+            if normalized_event_type in {"click", "redirect"}:
+                query = query.where(Event.event_type.in_(["click", "redirect"]))
+            elif normalized_event_type in {"create", "created"}:
+                query = query.where(Event.event_type.in_(["create", "created"]))
+            else:
+                query = query.where(Event.event_type == str(event_type).strip())
 
         # short_code filter (join with URL)
         short_code = request.args.get("short_code")
