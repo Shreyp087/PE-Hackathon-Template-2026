@@ -429,6 +429,37 @@ class TestEventsAdvanced:
         print(f"BULK EVENTS STATUS: {r.status_code}, BODY: {r.get_json()}")
         assert r.status_code in (200, 201)
 
+    def test_events_by_type_returns_only_exact_matches(self):
+        """GET /events?event_type=click should not include redirect events."""
+        c = _client()
+        create_resp = c.post("/urls", json={
+            "original_url": "https://example.com/exact-event-type",
+            "title": "Exact Event Type URL",
+            "user_id": 1,
+        })
+        assert create_resp.status_code == 201
+        created_url = create_resp.get_json()
+        short_code = created_url["short_code"]
+
+        manual_event_resp = c.post("/events", json={
+            "event_type": "click",
+            "url_id": created_url["id"],
+            "user_id": 1,
+            "details": "manual_click",
+        })
+        assert manual_event_resp.status_code == 201
+
+        redirect_resp = c.get(f"/urls/{short_code}/redirect", follow_redirects=False)
+        assert redirect_resp.status_code == 302
+
+        events_resp = c.get(f"/events?event_type=click&short_code={short_code}")
+        assert events_resp.status_code == 200
+        payload = events_resp.get_json()
+        items = payload["sample"] if isinstance(payload, dict) else payload
+
+        assert items
+        assert all(event["event_type"] == "click" for event in items)
+
     def test_bulk_events_csv_upload(self):
         """POST /events/bulk with CSV file upload."""
         c = _client()

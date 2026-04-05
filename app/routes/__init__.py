@@ -1322,13 +1322,7 @@ def list_events():
 
         event_type = _first_present(request.args, "event_type", "type")
         if event_type:
-            normalized_event_type = str(event_type).strip().lower()
-            if normalized_event_type in {"click", "redirect"}:
-                query = query.where(Event.event_type.in_(["click", "redirect"]))
-            elif normalized_event_type in {"create", "created"}:
-                query = query.where(Event.event_type.in_(["create", "created"]))
-            else:
-                query = query.where(Event.event_type == str(event_type).strip())
+            query = query.where(Event.event_type == str(event_type).strip())
 
         # short_code filter (join with URL)
         short_code = request.args.get("short_code")
