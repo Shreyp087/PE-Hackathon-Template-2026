@@ -175,6 +175,7 @@ def _serialize_url(url_record, include_short_url=False):
 def _serialize_event(event_record):
     payload = serialize(event_record)
     payload["details"] = _serialize_details(payload.get("details"))
+    payload["short_url_id"] = payload.get("url_id")
     return payload
 
 
@@ -423,11 +424,11 @@ def _load_events_csv(filepath, row_count=None):
             for row in reader:
                 if row_count is not None and loaded >= row_count:
                     break
-                url_id = _safe_int(row.get("url_id"))
+                url_id = _safe_int(row.get("url_id") or row.get("short_url_id") or row.get("url"))
                 user_id = _safe_int(row.get("user_id"))
                 payload = {
                     "id": _safe_int(row.get("id")),
-                    "url": URL.get_or_none(URL.id == url_id) if url_id else None,
+                    "url": _resolve_url_record(url_id) if url_id else None,
                     "user": User.get_or_none(User.id == user_id) if user_id is not None else None,
                     "event_type": str(row.get("event_type", "")).strip(),
                     "timestamp": _parse_datetime_value(row.get("timestamp")),
@@ -450,7 +451,7 @@ def _load_events_from_stream(stream_content, row_count=None):
         for row in reader:
             if row_count is not None and loaded >= row_count:
                 break
-            url_id = _safe_int(row.get("url_id") or row.get("url"))
+            url_id = _safe_int(row.get("url_id") or row.get("short_url_id") or row.get("url"))
             user_id = _safe_int(row.get("user_id") or row.get("user"))
             event_type = str(row.get("event_type") or row.get("type") or "").strip()
 
@@ -1097,6 +1098,11 @@ def redirect_short_code(code):
     return _perform_redirect(code)
 
 
+@main.get("/<code>")
+def redirect_short_code_root(code):
+    return _perform_redirect(code)
+
+
 @main.get("/urls/<code>/redirect")
 def redirect_short_code_alias(code):
     return _perform_redirect(code)
@@ -1336,7 +1342,7 @@ def list_events():
     try:
         query = Event.select().order_by(Event.timestamp.desc(), Event.id.desc())
 
-        url_id = _safe_int(_first_present(request.args, "url_id", "url"))
+        url_id = _safe_int(_first_present(request.args, "url_id", "short_url_id", "url"))
         if url_id is not None:
             query = query.where(Event.url_id == url_id)
 
@@ -1346,7 +1352,13 @@ def list_events():
 
         event_type = _first_present(request.args, "event_type", "type")
         if event_type:
-            query = query.where(Event.event_type == str(event_type).strip())
+            normalized_event_type = str(event_type).strip().lower()
+            if normalized_event_type in {"redirect", "accessed"}:
+                query = query.where(Event.event_type.in_(["redirect", "accessed"]))
+            elif normalized_event_type in {"create", "created"}:
+                query = query.where(Event.event_type.in_(["create", "created"]))
+            else:
+                query = query.where(Event.event_type == str(event_type).strip())
 
         # short_code filter (join with URL)
         short_code = request.args.get("short_code")
@@ -1401,7 +1413,9 @@ def create_event():
     raw_event_type = _first_present(payload, "event_type", "type")
     if raw_event_type is not None and not _is_string_like(raw_event_type):
         return jsonify(error="event_type must be a string"), 400
-    if _field_present(payload, "url_id", "url") and not _is_int_like(_first_present(payload, "url_id", "url")):
+    if _field_present(payload, "url_id", "short_url_id", "url") and not _is_int_like(
+        _first_present(payload, "url_id", "short_url_id", "url")
+    ):
         return jsonify(error="url_id must be an integer"), 400
     if _field_present(payload, "user_id", "user") and not _is_int_like(_first_present(payload, "user_id", "user")):
         return jsonify(error="user_id must be an integer"), 400
@@ -1416,11 +1430,11 @@ def create_event():
     event_type = str(_first_present(payload, "event_type", "type") or "").strip()
     if not event_type:
         return jsonify(error="event_type is required"), 400
-    if _first_present(payload, "url_id", "url") is None:
+    if _first_present(payload, "url_id", "short_url_id", "url") is None:
         return jsonify(error="url_id is required"), 400
 
     try:
-        url_id = _safe_int(_first_present(payload, "url_id", "url"))
+        url_id = _safe_int(_first_present(payload, "url_id", "short_url_id", "url"))
         user_id = _safe_int(_first_present(payload, "user_id", "user"))
         url_record = None
         if url_id is not None:
@@ -1432,11 +1446,17 @@ def create_event():
             user_record = User.get_or_none(User.id == user_id)
             if user_record is None:
                 return jsonify(error="user not found"), 404
+        details_value = _first_present(payload, "details", "metadata", "meta", "payload")
+        if details_value is None and url_record is not None:
+            details_value = {
+                "short_code": url_record.short_code,
+                "original_url": url_record.original_url,
+            }
         event_record = Event.create(
             url=url_record,
             user=user_record,
             event_type=event_type,
-            details=_details_to_text(_first_present(payload, "details", "metadata", "meta", "payload")),
+            details=_details_to_text(details_value),
         )
         return jsonify(_serialize_event(event_record)), 201
     except PeeweeException as exc:
@@ -1529,10 +1549,12 @@ def bulk_events():
                     if raw_event_type is not None and not _is_string_like(raw_event_type):
                         skipped += 1
                         continue
-                    if _first_present(item, "url_id", "url") is None:
+                    if _first_present(item, "url_id", "short_url_id", "url") is None:
                         skipped += 1
                         continue
-                    if _field_present(item, "url_id", "url") and not _is_int_like(_first_present(item, "url_id", "url")):
+                    if _field_present(item, "url_id", "short_url_id", "url") and not _is_int_like(
+                        _first_present(item, "url_id", "short_url_id", "url")
+                    ):
                         skipped += 1
                         continue
                     if _field_present(item, "user_id", "user") and not _is_int_like(_first_present(item, "user_id", "user")):
@@ -1553,9 +1575,7 @@ def bulk_events():
                         skipped += 1
                         continue
                     try:
-                        url_id = _safe_int(
-                            (item or {}).get("url_id", (item or {}).get("url"))
-                        )
+                        url_id = _safe_int(_first_present(item or {}, "url_id", "short_url_id", "url"))
                         user_id = _safe_int(
                             (item or {}).get("user_id", (item or {}).get("user"))
                         )
@@ -1567,13 +1587,19 @@ def bulk_events():
                         if user_id is not None and user_record is None:
                             skipped += 1
                             continue
+                        details_value = (
+                            (item or {}).get("details", (item or {}).get("metadata"))
+                        )
+                        if details_value is None and url_record is not None:
+                            details_value = {
+                                "short_code": url_record.short_code,
+                                "original_url": url_record.original_url,
+                            }
                         Event.create(
                             url=url_record,
                             user=user_record,
                             event_type=event_type,
-                            details=_details_to_text(
-                                (item or {}).get("details", (item or {}).get("metadata"))
-                            ),
+                            details=_details_to_text(details_value),
                         )
                         created += 1
                     except Exception:
