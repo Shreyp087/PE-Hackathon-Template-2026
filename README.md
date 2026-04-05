@@ -1,12 +1,15 @@
 <div align="center">
-  <h1>🔗 Link-Shrink 🔗</h1>
-  <h3>MLH PE Hackathon 2026</h3>
+
+  ![Link-Shrink Banner](link_shrink_thumbnail.png)
+
+  <h1>🔗 Link-Shrink</h1>
+  <p><strong>Production-grade URL Shortener</strong> with end-to-end TLS encryption, full-stack observability, and automated incident response. Built for the MLH Production Engineering Hackathon 2026.</p>
 
   <a href="https://link-shrink.duckdns.org">
-    <img src="https://img.shields.io/badge/🚀_Live_Demo-https%3A%2F%2Flink--shrink.duckdns.org-2ea44f?style=for-the-badge" alt="Live Demo" />
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-link--shrink.duckdns.org-2ea44f?style=for-the-badge" alt="Live Demo" />
   </a>
   <a href="https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml">
-    <img src="https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg" alt="CI Smoke Tests" style="height: 28px;" />
+    <img src="https://github.com/Shreyp087/PE-Hackathon-Template-2026/actions/workflows/ci.yml/badge.svg" alt="CI Smoke Tests" />
   </a>
   <br><br>
 
@@ -14,165 +17,237 @@
 
 </div>
 
-<br>
+---
 
-**Link-Shrink** is a production-ready URL shortener featuring **End-to-End TLS Encryption via Caddy**, built for the MLH Production Engineering Hackathon. Forked from the [PE-Hackathon-Template-2026](https://github.com/MLH-Fellowship/PE-Hackathon-Template-2026).
+## ✨ Features at a Glance
 
-## How We Prove Reliability
-- CI smoke tests run on every push and pull request to `main`.
-- The pipeline compiles Python sources and runs endpoint-level smoke tests.
-- Smoke tests verify `/health`, `/metrics`, `/system`, invalid URL handling, and JSON log formatter structure.
-- Operational reliability is also validated through Prometheus + Alertmanager + Grafana + Discord relay in Docker Compose.
+- **🔒 End-to-End Encrypted:** Automatic TLS/SSL via Caddy reverse proxy — zero manual certificate management.
+- **👁️ Full Observability:** Prometheus metrics, Grafana dashboards, structured JSON logs — all accessible from the browser.
+- **🚨 Automated Alerts:** 4 alert rules fire to Discord within 2 minutes of failure detection.
+- **📖 Operator-Ready:** Complete Runbook, Post-Incident Report, and deployment documentation.
+- **🧪 CI Tested:** Smoke tests run on every push — `/health`, `/metrics`, `/system`, and JSON log validation.
+- **☁️ Cloud Deployed:** Live on DigitalOcean with secure HTTPS at [link-shrink.duckdns.org](https://link-shrink.duckdns.org).
 
-## Database Backups & Resilience
-- Problem: If PostgreSQL runs only as a local container on a single Droplet, Droplet loss plus volume corruption can cause permanent short-link data loss.
-- Fix option 1 (recommended): use DigitalOcean Managed PostgreSQL with automated backups and PITR.
-- Fix option 2 (fallback): keep containerized PostgreSQL but run daily `pg_dump` backups to DigitalOcean Spaces (S3-compatible) via cron.
-- Production note: document and test restore steps, not just backup creation.
+---
 
-## Documentation
-For a complete look into our architecture, endpoints, telemetry, and operations, please see the full **[Documentation Index](docs/INDEX.md)**.
+## 🏗️ Architecture
 
-Quick start for judges and first-time reviewers: **[Jump to Demo Flow](#demo-flow-first-time-user)**.
+```mermaid
+flowchart TD
+    Client((Client))
+    
+    subgraph DigitalOcean Droplet
+        Proxy[Caddy TLS/SSL Reverse Proxy]
+        
+        subgraph App Server
+            App[Python Flask Backend]
+            Metrics[Prometheus Exporter]
+        end
+        
+        subgraph Database Tier
+            DB[(PostgreSQL)]
+        end
+        
+        subgraph Monitoring Tier
+            Prometheus[Prometheus]
+            Grafana[Grafana]
+            Alertmanager[Alertmanager]
+            Relay[Discord Relay]
+        end
+    end
 
-## Overview
-This service provides a fast, scalable way to shorten long URLs and redirect users seamlessly. It utilizes a Python Flask backend, Peewee ORM for database interactions, and PostgreSQL for robust data storage. The stack focuses on reliability, with a full monitoring suite ready for deployment on DigitalOcean.
+    Client -->|HTTPS :443| Proxy
+    Proxy -->|/shorten, /r/:code| App
+    Proxy -->|/grafana| Grafana
+    Proxy -->|/prometheus| Prometheus
+    Proxy -->|/alertmanager| Alertmanager
+    
+    App <-->|Read / Write| DB
+    Metrics --- App
+    Prometheus -->|Scrape /metrics| Metrics
+    Grafana -->|Query| Prometheus
+    Prometheus -->|Alert rules| Alertmanager
+    Alertmanager -->|Webhook| Relay
+```
 
-## Prerequisites
-- **uv**: Fast Python package manager. Install via:
-  - macOS/Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-  - Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-- **Docker & Docker Compose**: For running the PostgreSQL database and monitoring stack.
-- **Git**: For version control.
+> All observability tools are securely routed through Caddy subpaths — no exposed ports.
 
-## Step-by-step Setup
+---
 
-### 1. Clone the Repository
+## 🚀 Quick Start
+
+Get Link-Shrink running in 30 seconds:
+
 ```bash
-git clone https://github.com/YourUsername/PE-Hackathon-Template-2026.git
-cd PE-Hackathon-Template-2026
+git clone https://github.com/Shreyp087/PE-Hackathon-Template-2026.git && cd PE-Hackathon-Template-2026
+docker compose up -d --build
 ```
 
-### 2. Configure Environment
-Copy the example environment file.
+> [!NOTE]
+> Visit **[https://link-shrink.duckdns.org](https://link-shrink.duckdns.org)** to access the live deployment.
+> **Grafana:** [/grafana](https://link-shrink.duckdns.org/grafana) &nbsp;|&nbsp; **Prometheus:** [/prometheus](https://link-shrink.duckdns.org/prometheus) &nbsp;|&nbsp; **Alertmanager:** [/alertmanager](https://link-shrink.duckdns.org/alertmanager)
+
+---
+
+## 📚 Documentation
+
+<details>
+<summary><b>👨‍💻 For Developers</b></summary>
+
+Understand the codebase and start contributing:
+1. [Documentation Index](docs/INDEX.md) — Full orientation
+2. [Architecture Guide](docs/ARCHITECTURE.md) — System design deep dive
+3. [API Reference](docs/API.md) — All endpoints documented
+4. [Local Dev Setup](#%EF%B8%8F-manual-development-setup) — Environment configuration
+
+</details>
+
+<details>
+<summary><b>🛠️ For DevOps / SRE</b></summary>
+
+Operational guidance for production:
+1. [Deployment Guide](docs/DEPLOY.md) — Local to DigitalOcean
+2. [Config Reference](docs/CONFIG.md) — Environment variable tuning
+3. [Capacity Plan](docs/CAPACITY.md) — Scaling limits and baselines
+4. [Troubleshooting](docs/TROUBLESHOOTING.md) — Common fixes
+
+</details>
+
+<details>
+<summary><b>🚨 For On-Call Engineers</b></summary>
+
+Fast response when things break:
+1. [Incident Runbook](RUNBOOK.md) — Step-by-step alert playbooks
+2. [Post-Incident Report](POST_INCIDENT_REPORT.md) — Past incident analysis
+3. [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — Root cause diagnosis
+
+</details>
+
+<details>
+<summary><b>📑 Complete Documentation Index</b></summary>
+
+| Document | Audience | Purpose |
+| :--- | :--- | :--- |
+| [Architecture](docs/ARCHITECTURE.md) | Engineers | System design & data flow |
+| [API Reference](docs/API.md) | Developers | Endpoint documentation |
+| [Deployment](docs/DEPLOY.md) | SRE | Production deployment guide |
+| [Runbook](RUNBOOK.md) | On-Call | Incident response playbooks |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | On-Call | Diagnostic procedures |
+| [Decisions](docs/DECISIONS.md) | Architects | ADR decision log |
+| [Simulation](docs/SIMULATION.md) | QA / SRE | Load & failure testing |
+| [Config](docs/CONFIG.md) | DevOps | Environment variables |
+
+</details>
+
+---
+
+## 📊 Observability & Monitoring
+
+Link-Shrink tracks the **Four Golden Signals** — Latency, Traffic, Errors, and Saturation.
+
+| Alert | Trigger | Severity | Response |
+| :--- | :--- | :--- | :--- |
+| **ServiceDown** | Scrape target unreachable for 1m | 🔴 Critical | Check container health, restart app |
+| **HighErrorRate** | >5% 4xx/5xx responses for 2m | 🟡 Warning | Inspect logs, check database |
+| **SlowResponseTime** | P95 latency >1s for 2m | 🟡 Warning | Check load, inspect slow queries |
+| **HighCPU** | CPU >90% for 2m | 🟡 Warning | Stop synthetic load, scale if needed |
+
+> All alerts fire to **Discord** via a custom webhook relay within the 5-minute response objective.
+
+---
+
+## ⚙️ Setup & Operations
+
+### 🛠️ Manual Development Setup
+
+<details>
+<summary><b>Expand full setup instructions</b></summary>
+
+1. **Configure Environment:**
+   ```bash
+   cp .env.example .env
+   ```
+   Set `DB_HOST=db` and `DB_PORT=5432` for Docker Compose.
+
+2. **Start Services:**
+   ```bash
+   docker compose up -d db prometheus alertmanager discord-relay grafana
+   ```
+
+3. **Install Dependencies & Run:**
+   ```bash
+   uv sync
+   uv run run.py
+   ```
+
+4. **Seed the Database:**
+   ```bash
+   uv run python scripts/fake_data.py --users 50 --urls 200 --events 2000 --days 30
+   ```
+
+5. **Verify Health:**
+   ```bash
+   curl http://localhost:5000/health
+   curl http://localhost:5000/metrics
+   ```
+
+> [!IMPORTANT]
+> Ensure your `.env` contains the correct database credentials before starting. See [Config Reference](docs/CONFIG.md) for all variables.
+
+</details>
+
+### 🧪 Testing
+
 ```bash
-cp .env.example .env
-```
-If you run the app locally (outside Docker), set:
-- `DB_HOST=localhost`
-- `DB_PORT=5432`
-
-If you run the app with Docker Compose, set:
-- `DB_HOST=db`
-- `DB_PORT=5432`
-- `DB_HOST_PORT=5432` (or another host port if needed)
-
-### 3. Start Services
-Start only PostgreSQL (minimal local app run):
-```bash
-docker compose up -d db
+uv run pytest -q tests/test_smoke.py   # Smoke tests
+uv run pytest -q                        # Full suite
 ```
 
-Start full observability stack (recommended for Incident Response quest):
-```bash
-docker compose up -d db prometheus alertmanager discord-relay grafana
-```
+> [!TIP]
+> CI runs smoke tests automatically on every push to `main`. Check the badge at the top for current status.
 
-### 4. Install Dependencies
-Use `uv` to automatically create a virtual environment and install dependencies:
-```bash
-uv sync
-```
+---
 
-### 5. Seed the Database
-Option A: seed from CSV files (`users.csv`, `urls.csv`, `events.csv`):
-```bash
-uv run seed.py --users users.csv --urls urls.csv --events events.csv
-```
+## 🏆 Quest Status — Incident Response
 
-Option B: generate synthetic data quickly:
-```bash
-uv run python scripts/fake_data.py --users 50 --urls 200 --events 2000 --days 30
-```
+- [x] **🥉 Bronze — The Watchtower:** Structured JSON logging, `/metrics` endpoint, browser-accessible logs.
+- [x] **🥈 Silver — The Alarm:** 4 alert rules configured, Discord notifications fire within 2 minutes.
+- [x] **🥇 Gold — The Command Center:** Grafana dashboard with Golden Signals, comprehensive Runbook, incident diagnosis capability.
 
-### 6. Run the Server
-Start the Flask application:
-```bash
-uv run run.py
-```
-The server will start locally on `http://localhost:5000`.
+**Incident Verification (Apr 5, 2026):**
+Tested: *Service Down*, *High Error Rate*, *Slow Response Time*, *High CPU*.
+Result: **All alerts triggered and resolved successfully.** ✅
 
-### 7. Verify Everything Is Up
-```bash
-curl http://localhost:5000/health
-curl http://localhost:5000/metrics
-```
+---
 
-If full stack is running, you can also open:
-- Grafana: `https://link-shrink.duckdns.org/grafana`
-- Prometheus: `https://link-shrink.duckdns.org/prometheus`
-- Alertmanager: `https://link-shrink.duckdns.org/alertmanager`
+## 🔮 Future Scope
 
-## Demo Flow (First-Time User)
-Use this exact flow to go from setup to testing in about 10 minutes.
+- [ ] **Basic Auth:** Password-protect Prometheus and Alertmanager endpoints.
+- [ ] **Rate Limiting:** Per-IP throttling on `/shorten` to prevent abuse.
+- [ ] **Database Backups:** Automated `pg_dump` to S3-compatible storage.
+- [ ] **Custom Domains:** Enterprise-grade branded short links.
 
-### Terminal 1: Start the app
-```bash
-uv run run.py
-```
+---
 
-### Terminal 2: Run a full demo sequence
-1. Health + metrics checks:
-```bash
-curl http://localhost:5000/health
-curl http://localhost:5000/system
-curl http://localhost:5000/metrics
-```
+## ❓ FAQ
 
-2. Create and test a short URL:
-```bash
-curl -X POST http://localhost:5000/shorten \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://mlh.io/seasons/2026/events"}'
-curl -i http://localhost:5000/r/<short_code>
-```
+<details>
+<summary>Is this deployed and live?</summary>
+Yes! Visit <a href="https://link-shrink.duckdns.org">https://link-shrink.duckdns.org</a> — it's running on a DigitalOcean Droplet with automatic HTTPS via Caddy.
+</details>
 
-3. Run smoke tests (fast validation):
-```bash
-uv run pytest -q tests/test_smoke.py
-```
+<details>
+<summary>How is TLS handled?</summary>
+Caddy runs inside Docker Compose and automatically provisions and renews Let's Encrypt certificates. No manual Nginx or Certbot setup required.
+</details>
 
-4. Optional: run full test suite:
-```bash
-uv run pytest -q
-```
+<details>
+<summary>How do I trigger an alert for testing?</summary>
+Run <code>docker compose stop app</code> to trigger a ServiceDown alert. Discord will receive a notification within ~2 minutes. Restart with <code>docker compose start app</code>.
+</details>
 
-5. Optional incident-response demo:
-```bash
-uv run python scripts/watch_alerts.py
-uv run python scripts/simulate.py
-```
+---
 
-### Where to go next
-- Testing and simulation details: [docs/SIMULATION.md](docs/SIMULATION.md)
-- Alert triage steps: [RUNBOOK.md](RUNBOOK.md)
-- API endpoint reference: [docs/API.md](docs/API.md)
-- Troubleshooting common issues: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-
-## Quick Start Example
-Test the URL shortener endpoint via `curl`:
-```bash
-curl -X POST http://localhost:5000/shorten \
-     -H "Content-Type: application/json" \
-     -d '{"url":"https://mlh.io/seasons/2026/events"}'
-```
-Response:
-```json
-{
-  "short_url": "http://localhost:5000/r/aB3dE"
-}
-```
-Test the redirection:
-```bash
-curl -i http://localhost:5000/r/aB3dE
-```
+<p align="center">
+  <strong>🔗 Link-Shrink — Built for Production, Proven Under Pressure (April 2026)</strong>
+</p>
